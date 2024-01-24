@@ -44,30 +44,6 @@
 #include <nil/blueprint/transpiler/evm_verifier_gen.hpp>
 #include <nil/blueprint/transpiler/public_input.hpp>
 
-bool read_buffer_from_file(std::ifstream &ifile, std::vector<std::uint8_t> &v) {
-    char c;
-    char c1;
-    uint8_t b;
-
-    ifile >> c;
-    if (c != '0')
-        return false;
-    ifile >> c;
-    if (c != 'x')
-        return false;
-    while (ifile) {
-        std::string str = "";
-        ifile >> c >> c1;
-        if (!isxdigit(c) || !isxdigit(c1))
-            return false;
-        str += c;
-        str += c1;
-        b = stoi(str, 0, 0x10);
-        v.push_back(b);
-    }
-    return true;
-}
-
 template<typename ProfilingType, typename ConstraintSystemType, typename ColumnsRotationsType,
          typename ArithmetizationParams>
 void print_sol_files(ConstraintSystemType &constraint_system, ColumnsRotationsType &columns_rotations,
@@ -105,22 +81,16 @@ inline std::vector<std::size_t> generate_random_step_list(const std::size_t r, c
 }
 
 template<typename FRIScheme, typename FieldType>
-typename FRIScheme::params_type create_fri_params(std::size_t degree_log, const int max_step = 1) {
-    typename FRIScheme::params_type params;
-    nil::crypto3::math::polynomial<typename FieldType::value_type> q = {0, 0, 1};
-
-    constexpr std::size_t expand_factor = 0;
+typename FRIScheme::params_type create_fri_params(
+        std::size_t degree_log, const int max_step = 1, std::size_t expand_factor = 0) {
     std::size_t r = degree_log - 1;
 
-    std::vector<std::shared_ptr<nil::crypto3::math::evaluation_domain<FieldType>>> domain_set =
-        nil::crypto3::math::calculate_domain_set<FieldType>(degree_log + expand_factor, r);
-
-    params.r = r;
-    params.D = domain_set;
-    params.max_degree = (1 << degree_log) - 1;
-    params.step_list = generate_random_step_list(r, max_step);
-
-    return params;
+    return typename FRIScheme::params_type(
+        (1 << degree_log) - 1, // max_degree
+        nil::crypto3::math::calculate_domain_set<FieldType>(degree_log + expand_factor, r),
+        generate_random_step_list(r, max_step),
+        expand_factor
+    );
 }
 
 template<typename TIter>
@@ -135,13 +105,13 @@ void print_hex_byteblob(std::ostream &os, TIter iter_begin, TIter iter_end, bool
     }
 }
 
-template<typename Endianness, typename Proof>
-void proof_print(Proof &proof, const std::string &output_file) {
+template<typename Endianness, typename Proof, typename CommitmentParamsType>
+void proof_print(Proof &proof, const CommitmentParamsType& commitment_params, const std::string &output_file) {
     using namespace nil::crypto3::marshalling;
 
     using TTypeBase = nil::marshalling::field_type<Endianness>;
     using proof_marshalling_type = nil::crypto3::zk::snark::placeholder_proof<TTypeBase, Proof>;
-    auto filled_placeholder_proof = types::fill_placeholder_proof<Endianness, Proof>(proof);
+    auto filled_placeholder_proof = types::fill_placeholder_proof<Endianness, Proof>(proof, commitment_params);
 
     std::vector<std::uint8_t> cv;
     cv.resize(filled_placeholder_proof.length(), 0x00);
@@ -151,6 +121,12 @@ void proof_print(Proof &proof, const std::string &output_file) {
     out.open(output_file);
     print_hex_byteblob(out, cv.cbegin(), cv.cend(), false);
 }
+
+template<typename BlueprintFieldType, bool multiprover>
+int curve_dependent_main(
+    boost::program_options::options_description options_desc,
+    boost::program_options::variables_map vm
+);
 
 int main(int argc, char *argv[]) {
 
@@ -176,6 +152,8 @@ int main(int argc, char *argv[]) {
             ("lookups-inline-threshold", boost::program_options::value<std::size_t>(), "Lookups inline size limit. Default = 0, none of the lookups are inlined")
             ("deduce-horner", "Detect polynomials over one variable and deduce to Horner's formula")
             ("optimize-powers", "Optimize terms that are powers of single variable")
+            ("multi-prover", "Pass this flag if input circuit is a part of larger circuit, divided for faster paralel proving")
+            ("elliptic-curve-type,e", boost::program_options::value<std::string>(), "Native elliptic curve type (pallas, vesta, ed25519, bls12381)")
             ;
     // clang-format on
 
@@ -183,6 +161,64 @@ int main(int argc, char *argv[]) {
     boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(options_desc).run(),
                                   vm);
     boost::program_options::notify(vm);
+
+    std::string elliptic_curve;
+
+    if (vm.count("elliptic-curve-type")) {
+        elliptic_curve = vm["elliptic-curve-type"].as<std::string>();
+    } else {
+        std::cerr << "Invalid command line argument - elliptic curve type is not specified" << std::endl;
+        std::cout << options_desc << std::endl;
+        return 1;
+    }
+
+    std::map<std::string, int> curve_options{
+        {"pallas", 0},
+        {"vesta", 1},
+        {"ed25519", 2},
+        {"bls12381", 3},
+    };
+
+    if (curve_options.find(elliptic_curve) == curve_options.end()) {
+        std::cerr << "Invalid command line argument -e (Native elliptic curve type): " << elliptic_curve << std::endl;
+        std::cout << options_desc << std::endl;
+        return 1;
+    }
+
+    switch (curve_options[elliptic_curve]) {
+        case 0: {
+            using curve_type = nil::crypto3::algebra::curves::pallas;
+            using BlueprintFieldType = typename curve_type::base_field_type;
+            return (vm.count("multi-prover") > 0) ?
+                curve_dependent_main<BlueprintFieldType, true>(options_desc, vm) :
+                curve_dependent_main<BlueprintFieldType, false>(options_desc, vm);
+            break;
+        }
+        case 1: {
+            UNREACHABLE("vesta curve based circuits are not supported yet");
+            break;
+        }
+        case 2: {
+            UNREACHABLE("ed25519 curve based circuits are not supported yet");
+            break;
+        }
+        case 3: {
+            using curve_type = nil::crypto3::algebra::curves::bls12<381>;
+            using BlueprintFieldType = typename curve_type::base_field_type;
+            return (vm.count("multi-prover") > 0) ?
+                curve_dependent_main<BlueprintFieldType, true>(options_desc, vm) :
+                curve_dependent_main<BlueprintFieldType, false>(options_desc, vm);
+            break;
+        }
+    };
+
+}
+
+template<typename BlueprintFieldType, bool is_multi_prover>
+int curve_dependent_main(
+    boost::program_options::options_description options_desc,
+    boost::program_options::variables_map vm
+) {
 
     if (vm.count("help")) {
         std::cout << options_desc << std::endl;
@@ -249,10 +285,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    using curve_type = nil::crypto3::algebra::curves::pallas;
-    using BlueprintFieldType = typename curve_type::base_field_type;
     constexpr std::size_t WitnessColumns = 15;
-    constexpr std::size_t PublicInputColumns = 1;
+    constexpr std::size_t PublicInputColumns = is_multi_prover ? 2 : 1;
     constexpr std::size_t ConstantColumns = 35;
     constexpr std::size_t SelectorColumns = 36;
 
@@ -289,13 +323,18 @@ int main(int argc, char *argv[]) {
     ConstraintSystemType constraint_system;
     {
         std::ifstream ifile;
-        ifile.open(circuit_file_name);
+        ifile.open(circuit_file_name, std::ios_base::binary | std::ios_base::in);
         if (!ifile.is_open()) {
             std::cout << "Cannot find input file " << circuit_file_name << std::endl;
             return 1;
         }
         std::vector<std::uint8_t> v;
-        if (!read_buffer_from_file(ifile, v)) {
+        ifile.seekg(0, std::ios_base::end);
+        const auto fsize = ifile.tellg();
+        v.resize(fsize);
+        ifile.seekg(0, std::ios_base::beg);
+        ifile.read(reinterpret_cast<char*>(v.data()), fsize);
+        if (!ifile) {
             std::cout << "Cannot parse input file " << circuit_file_name << std::endl;
             return 1;
         }
@@ -313,13 +352,18 @@ int main(int argc, char *argv[]) {
     AssignmentTableType assignment_table;
     {
         std::ifstream iassignment;
-        iassignment.open(assignment_table_file_name);
+        iassignment.open(assignment_table_file_name, std::ios_base::binary | std::ios_base::in);
         if (!iassignment) {
             std::cout << "Cannot open " << assignment_table_file_name << std::endl;
             return 1;
         }
         std::vector<std::uint8_t> v;
-        if (!read_buffer_from_file(iassignment, v)) {
+        iassignment.seekg(0, std::ios_base::end);
+        const auto fsize = iassignment.tellg();
+        v.resize(fsize);
+        iassignment.seekg(0, std::ios_base::beg);
+        iassignment.read(reinterpret_cast<char*>(v.data()), fsize);
+        if (!iassignment) {
             std::cout << "Cannot parse input file " << assignment_table_file_name << std::endl;
             return 1;
         }
@@ -469,9 +513,7 @@ int main(int argc, char *argv[]) {
 
             std::string proof_path = output_folder_path + "/proof.bin";
             std::cout << "Writing proof to " << proof_path << "..." << std::endl;
-            auto filled_placeholder_proof =
-                nil::crypto3::marshalling::types::fill_placeholder_proof<Endianness, ProofType>(proof);
-            proof_print<Endianness, ProofType>(proof, proof_path);
+            proof_print<Endianness, ProofType>(proof, fri_params, proof_path);
             std::cout << "Proof written" << std::endl;
         }
         return 0;

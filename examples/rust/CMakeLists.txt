@@ -2,15 +2,19 @@ add_custom_target(circuit_rust_examples)
 add_custom_target(assign_rust_examples)
 add_custom_target(prove_rust_examples)
 
-set(RUSTC "${CMAKE_BINARY_DIR}/libs/rslang/build/host/stage1/bin/rustc")
-set(CARGO "${CMAKE_BINARY_DIR}/libs/rslang/target/release/cargo")
+set(RUSTC "${CMAKE_BINARY_DIR}/libs/rslang/build/host/stage${RSLANG_BUILD_STAGE}/bin/rustc")
+if(${RSLANG_BUILD_EXTENDED})
+    set(CARGO "${CMAKE_BINARY_DIR}/libs/rslang/build/host/stage${RSLANG_BUILD_STAGE}-tools-bin/cargo")
+else()
+    set(CARGO "${CMAKE_BINARY_DIR}/libs/rslang/target/release/cargo")
+endif()
 set(TARGET "assigner-unknown-unknown")
 set(TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/target")
 
-function(add_rust_example example_target)
+function(add_rust_example_without_proving example_target)
     set(prefix ARG)
     set(noValues "")
-    set(singleValues INPUT)
+    set(singleValues INPUT PRIVATE_INPUT CURVE_TYPE MAX_NUM_PROVERS)
     set(multiValues EXAMPLE_NAME)
     cmake_parse_arguments(${prefix}
                         "${noValues}"
@@ -19,7 +23,7 @@ function(add_rust_example example_target)
                         ${ARGN})
 
     add_custom_target(${example_target}
-                      RUSTC=${RUSTC} ${CARGO} build --target-dir ${TARGET_DIR} --target ${TARGET} --example ${ARG_EXAMPLE_NAME} --release --ignore-rust-version
+                      RUSTC=${RUSTC} ${CARGO} build --target-dir ${TARGET_DIR} --target ${TARGET} --example ${ARG_EXAMPLE_NAME} --release
                       DEPENDS rslang
                       USES_TERMINAL
                       VERBATIM
@@ -29,18 +33,46 @@ function(add_rust_example example_target)
 
     set(binary_name ${TARGET_DIR}/${TARGET}/release/examples/${ARG_EXAMPLE_NAME}.ll)
 
-    assign_ir(${example_target} ${binary_name} ${ARG_INPUT})
-    add_dependencies(assign_rust_examples ${example_target}_assign)
+    if(NOT DEFINED ARG_MAX_NUM_PROVERS)
+        set(ARG_MAX_NUM_PROVERS 0)
+    endif()
 
-    gen_proof(${example_target} ${ARG_INPUT})
+    if(NOT DEFINED ARG_PRIVATE_INPUT)
+        set (ARG_PRIVATE_INPUT "")
+    endif()
+
+    assign_ir(${example_target} ${binary_name} ${ARG_INPUT} "" ${ARG_CURVE_TYPE} ${ARG_MAX_NUM_PROVERS})
+    add_dependencies(assign_rust_examples ${example_target}_assign)
+endfunction()
+
+function(add_rust_example_with_proving example_target)
+    set(prefix ARG)
+    set(noValues "")
+    set(singleValues INPUT CURVE_TYPE)
+    set(multiValues EXAMPLE_NAME)
+    cmake_parse_arguments(${prefix}
+                        "${noValues}"
+                        "${singleValues}"
+                        "${multiValues}"
+                        ${ARGN})
+
+    add_rust_example_without_proving(${example_target} ${ARGN})
+
+    if(NOT DEFINED ARG_MAX_NUM_PROVERS)
+        set(ARG_MAX_NUM_PROVERS 0)
+    endif()
+
+    gen_proof(${example_target} ${ARG_INPUT} ${ARG_CURVE_TYPE} ${ARG_MAX_NUM_PROVERS})
     add_dependencies(prove_rust_examples ${example_target}_prove)
 endfunction()
 
-add_rust_example(arithmetics_builtins_rust_example EXAMPLE_NAME arithmetics_builtins INPUT arithmetics.inp)
-add_rust_example(arithmetics_arkworks_rust_example EXAMPLE_NAME arithmetics_arkworks INPUT arithmetics.inp)
-add_rust_example(ed25519_curve_add_rust_example EXAMPLE_NAME ed25519_curve_add INPUT ed25519_curve_add.inp)
-add_rust_example(eddsa_signature_verification_rust_example EXAMPLE_NAME eddsa_signature_verification INPUT eddsa_signature_verification_rust.inp)
-add_rust_example(eddsa_signature_verification_builtins_rust_example EXAMPLE_NAME eddsa_signature_verification_builtins INPUT eddsa_signature_verification_rust.inp)
-#add_rust_example(merkle_tree_sha2_256_rust_example EXAMPLE_NAME merkle_tree_sha2_256 INPUT merkle_tree_sha2_256_rust.inp)
-#add_rust_example(sha2_256_rust_example EXAMPLE_NAME sha2_256 INPUT sha2_256_rust.inp)
-add_rust_example(sha2_512_rust_example EXAMPLE_NAME sha2_512 INPUT sha2_512_rust.inp)
+add_rust_example_with_proving(arithmetics_builtins_rust_example EXAMPLE_NAME arithmetics_builtins INPUT arithmetics.inp CURVE_TYPE pallas)
+add_rust_example_with_proving(arithmetics_arkworks_rust_example EXAMPLE_NAME arithmetics_arkworks INPUT arithmetics.inp CURVE_TYPE pallas)
+add_rust_example_with_proving(ed25519_curve_add_rust_example EXAMPLE_NAME ed25519_curve_add INPUT ed25519_curve_add.inp CURVE_TYPE pallas)
+
+add_rust_example_without_proving(eddsa_signature_verification_rust_example EXAMPLE_NAME eddsa_signature_verification INPUT eddsa_signature_verification_rust.inp CURVE_TYPE pallas)
+add_rust_example_without_proving(eddsa_signature_verification_builtins_rust_example EXAMPLE_NAME eddsa_signature_verification_builtins INPUT eddsa_signature_verification_rust.inp CURVE_TYPE pallas)
+add_rust_example_without_proving(merkle_tree_sha2_256_rust_example EXAMPLE_NAME merkle_tree_sha2_256 INPUT merkle_tree_sha2_256_rust.inp CURVE_TYPE pallas)
+add_rust_example_without_proving(sha2_256_rust_example EXAMPLE_NAME sha2_256 INPUT sha2_256_rust.inp CURVE_TYPE pallas)
+add_rust_example_without_proving(sha2_512_rust_example EXAMPLE_NAME sha2_512 INPUT sha2_512_rust.inp CURVE_TYPE pallas)
+add_rust_example_without_proving(validate_merkle_path_sha2_256_rust_example EXAMPLE_NAME validate_merkle_path_sha2_256 INPUT validate_merkle_path_sha2_256_rust.inp CURVE_TYPE pallas)

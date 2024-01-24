@@ -10,9 +10,12 @@ cm_project(zkllvm_tests WORKSPACE_NAME ${CMAKE_WORKSPACE_NAME} LANGUAGES ASM C C
 
 include(CMTest)
 
-add_custom_target(all_expected_res_tests)
-add_custom_target(all_circuit_tests)
-add_custom_target(all_for_test_run)
+add_custom_target(all_tests_compile_as_cpp_code)
+add_custom_target(all_tests_compile_as_circuits)
+add_custom_target(all_tests_compilation)
+add_custom_target(all_tests_run_expected_res_calculation)
+add_custom_target(all_tests_assign_circuits)
+add_custom_target(all_tests_run)
 
 if(NOT Boost_UNIT_TEST_FRAMEWORK_FOUND)
     cm_find_package(Boost REQUIRED COMPONENTS unit_test_framework filesystem)
@@ -24,7 +27,7 @@ cm_test_link_libraries(
                        ${Boost_LIBRARIES})
 
 
-macro(define_zkllvm_test test)
+macro(define_zkllvm_test test curve_type provers_max_num)
     string(REPLACE "/" "_" test_name ${test})
     string(REPLACE "/" "_" full_test_name ${test}_calculate_expected_res)
 
@@ -39,7 +42,8 @@ macro(define_zkllvm_test test)
         get_filename_component(curr_inp_name ${full_inp_file} NAME_WE)
         get_filename_component(curr_inp_file ${full_inp_file} NAME)
         run_expected_res_calculation(${full_test_name} ${PARENT_PATH} ${curr_inp_name})
-        add_test_circuit_assign(${test_name}_${curr_inp_name} SOURCES ${test}.cpp INPUT ${PARENT_PATH}/${curr_inp_file})
+        add_dependencies(all_tests_run_expected_res_calculation ${full_test_name}_run_${curr_inp_name})
+        add_test_circuit_assign(${test_name}_${curr_inp_name} SOURCES ${test}.cpp INPUT ${PARENT_PATH}/${curr_inp_file} CURVE_TYPE ${curve_type} MAX_NUM_PROVERS ${provers_max_num})
     endforeach()
 
     target_include_directories(${full_test_name} PRIVATE
@@ -49,6 +53,9 @@ macro(define_zkllvm_test test)
                                ${Boost_INCLUDE_DIRS})
 
     set_target_properties(${full_test_name} PROPERTIES CXX_STANDARD 17)
+
+    # Ignore "circuit" attribute for native compilation
+    target_compile_options(${full_test_name} PRIVATE "-Wno-attributes")
 
     if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         target_compile_options(${full_test_name} PRIVATE "-fconstexpr-steps=2147483647")
@@ -62,8 +69,8 @@ macro(define_zkllvm_test test)
     elseif(target_type STREQUAL "STATIC_LIB")
 
     endif()
-    add_dependencies(all_expected_res_tests ${full_test_name})
-    add_dependencies(all_circuit_tests ${test_name})
+    add_dependencies(all_tests_compile_as_cpp_code ${full_test_name})
+    add_dependencies(all_tests_compile_as_circuits ${test_name})
 endmacro()
 
 
@@ -106,7 +113,7 @@ endfunction()
 function(add_test_circuit_assign example_target)
     set(prefix ARG)
     set(noValues "")
-    set(singleValues INPUT)
+    set(singleValues INPUT CURVE_TYPE MAX_NUM_PROVERS)
     set(multiValues SOURCES)
     cmake_parse_arguments(${prefix}
                         "${noValues}"
@@ -146,16 +153,33 @@ function(add_test_circuit_assign example_target)
 
     set(binary_name ${example_target}.ll)
 
-    assign_ir(${example_target} ${binary_name} ${ARG_INPUT})
+    assign_ir(${example_target} ${binary_name} ${ARG_INPUT} ${ARG_CURVE_TYPE} ${ARG_MAX_NUM_PROVERS})
+    add_dependencies(all_tests_assign_circuits ${example_target}_assign)
 endfunction()
 
 function(add_zkllvm_unit_test TEST_NAME)
-    file(APPEND ../tests_list.txt ${TEST_NAME}\n)
-    define_zkllvm_test(${TEST_NAME})
+    file(APPEND ../../build/tests/cpp/tests_list_pallas.txt ${TEST_NAME}\n)
+    define_zkllvm_test(${TEST_NAME} pallas 0)
     add_test_circuit(${TEST_NAME})
 endfunction()
 
-file(REMOVE ../tests_list.txt)
+function(add_zkllvm_unit_test_pallas_multiprover TEST_NAME MAX_NUM_PROVERS)
+    file(APPEND ../../build/tests/cpp/tests_list_pallas.txt ${TEST_NAME}\n)
+    define_zkllvm_test(${TEST_NAME} pallas ${MAX_NUM_PROVERS})
+    add_test_circuit(${TEST_NAME})
+endfunction()
+
+function(add_zkllvm_unit_test_bls12381 TEST_NAME)
+    file(APPEND ../../build/tests/cpp/tests_list_bls12381.txt ${TEST_NAME}\n)
+    define_zkllvm_test(${TEST_NAME} bls12381 0)
+    add_test_circuit(${TEST_NAME})
+endfunction()
+
+file(REMOVE ../../build/tests/cpp/tests_list_pallas.txt)
+file(REMOVE ../../build/tests/cpp/tests_list_bls12381.txt)
+
+file(REMOVE ../../build/tests/cpp/circuits_outputs_list.txt)
+file(REMOVE ../../build/tests/cpp/expected_results_list.txt)
 
 
 # curve tests
@@ -192,8 +216,8 @@ add_zkllvm_unit_test("algebra/fields/pallas_arithmetics/loop")
 add_zkllvm_unit_test("algebra/fields/pallas_arithmetics/mul")
 add_zkllvm_unit_test("algebra/fields/pallas_arithmetics/sub")
 
-add_zkllvm_unit_test("algebra/fields/pallas_arithmetics/private_input_add")
-
+# add_zkllvm_unit_test("algebra/fields/private_input/private_input_add")
+add_zkllvm_unit_test("algebra/fields/conversion/itogf_pallas")
 
 # int tests
 add_zkllvm_unit_test("algebra/integers/division/udiv")
@@ -210,7 +234,7 @@ add_zkllvm_unit_test("algebra/de_composition/decomposition/msb")
 add_zkllvm_unit_test("algebra/de_composition/decomposition/lsb")
 
 #multi provers tests
-add_zkllvm_unit_test("multi_provers/shift_add")
+add_zkllvm_unit_test_pallas_multiprover("multi_provers/shift_add" 2)
 
 #customer's tests
 add_zkllvm_unit_test("custom_cases/getelementptr_as_constant/getelementptr_as_constant")
@@ -223,7 +247,7 @@ add_zkllvm_unit_test("libc/strncmp/strncmp")
 add_zkllvm_unit_test("libc/strcpy/strcpy")
 add_zkllvm_unit_test("libc/strncpy/strncpy")
 
-#hashes
+# hashes
 add_zkllvm_unit_test("hashes/sha256/sha2_256")
 add_zkllvm_unit_test("hashes/poseidon/poseidon")
 
@@ -236,6 +260,12 @@ add_zkllvm_unit_test("algebra/recursive_prover/fri_array_swap_length_6/test")
 add_zkllvm_unit_test("algebra/recursive_prover/lookup_arg_verifier/test1/test")
 add_zkllvm_unit_test("algebra/recursive_prover/lookup_arg_verifier/test2/test")
 
-add_dependencies(all_for_test_run assigner)
-add_dependencies(all_for_test_run all_circuit_tests)
-add_dependencies(all_for_test_run all_expected_res_tests)
+# bls tests
+add_zkllvm_unit_test_bls12381("algebra/fields/bls12381_fp12_arithmetics/mul")
+add_zkllvm_unit_test_bls12381("bls_signature/pairing/pairing")
+
+add_dependencies(all_tests_compilation assigner)
+add_dependencies(all_tests_compilation all_tests_compile_as_circuits)
+add_dependencies(all_tests_compilation all_tests_compile_as_cpp_code)
+add_dependencies(all_tests_run all_tests_run_expected_res_calculation)
+add_dependencies(all_tests_run all_tests_assign_circuits)

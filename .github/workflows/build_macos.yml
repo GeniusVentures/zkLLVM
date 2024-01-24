@@ -42,6 +42,7 @@ jobs:
           brew install \
             boost@1.76 \
             cmake \
+            ninja \
             icu4c \
             bash
 
@@ -55,6 +56,7 @@ jobs:
           git --version
           cc --version
           cmake --version
+          ninja --version
           bash --version
           python3 --version
           which -a bash
@@ -92,7 +94,7 @@ jobs:
           LDFLAGS: "-L/usr/local/opt/icu4c/lib"
           CPPFLAGS: "-I/usr/local/opt/icu4c/include"
         run: |
-          cmake -G "Unix Makefiles" \
+          cmake -G "Ninja" \
             -B build \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release \
@@ -100,32 +102,50 @@ jobs:
 
       - name: Build zkllvm
         run: |
-          make -C build assigner clang transpiler -j$(sysctl -n hw.logicalcpu)
+          cmake --build build -t assigner clang transpiler
 
       - name: Build IR of the C++ examples
         run: |
-          make -C build circuit_cpp_examples -j$(sysctl -n hw.logicalcpu)
+          cmake --build build -t circuit_cpp_examples
           ls -al ./build/examples/cpp
 
       - name: Build circuit and assigner of the C++ examples
         run: |
-          make -C build assign_cpp_examples -j$(sysctl -n hw.logicalcpu)
+          cmake --build build -t assign_cpp_examples
 
-      - name: Build tests
+      - name: Compile tests as cpp code
         run: |
-          make -C build all_expected_res_tests -j$(sysctl -n hw.logicalcpu)
-          make -C build all_circuit_tests -j$(sysctl -n hw.logicalcpu)
+          cmake --build build -t all_tests_compile_as_cpp_code
 
-      - name: Run tests
+      - name: Compile tests as circuits
         run: |
-          chmod +x ./tests/run_tests.sh
-          bash ./tests/run_tests.sh -j$(sysctl -n hw.logicalcpu)
+          cmake --build build -t all_tests_compile_as_circuits
+
+      - name: Run tests as cpp code (expected res calculation)
+        run: |
+          cmake --build build -t all_tests_run_expected_res_calculation
+
+      - name: Run tests as circuits (real res calculation)
+        run: |
+          cmake --build build -t all_tests_assign_circuits
+
+      - name: Compare expected and real test results
+        run: |
+          chmod +x ./tests/run_test_results_comparison.sh
+          bash ./tests/run_test_results_comparison.sh
 
       - name: Run tests on faulty inputs
         run: |
           chmod +x ./tests/run_tests_faulty_input.sh
-          bash ./tests/run_tests_faulty_input.sh -j$(sysctl -n hw.logicalcpu)
+          bash ./tests/run_tests_faulty_input.sh pallas
+
+      - name: Run assigner tests
+        run: |
+          cd libs/assigner/test
+          chmod +x run_tests.py
+          python3 run_tests.py ../../../build/bin/assigner/assigner
+          cd ../../../
 
       - name: Build proof for the circuit of the C++ examples
         run: |
-          make -C build prove_cpp_examples -j$(sysctl -n hw.logicalcpu)
+          cmake --build build -t prove_cpp_examples

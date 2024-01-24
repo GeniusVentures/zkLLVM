@@ -39,10 +39,14 @@ option(BUILD_WITH_BOOST_STATIC_LIBS "Build using Boost static libraries" TRUE)
 option(BUILD_TESTS "Build unit tests" FALSE)
 option(BUILD_DOCS "Build with configuring Doxygen documentation compiler" TRUE)
 option(CIRCUIT_BINARY_OUTPUT "Emit circuit IR as binary file" FALSE)
+option(RSLANG_BUILD_EXTENDED "Build Rust tools (see build.extended)" FALSE)
 
 set(BUILD_WITH_TARGET_ARCHITECTURE "" CACHE STRING "Target build architecture")
 set(DOXYGEN_OUTPUT_DIR "${CMAKE_CURRENT_LIST_DIR}/docs" CACHE STRING "Specify doxygen output directory")
 set(ZKLLVM_DEV_ENVIRONMENT TRUE)
+set(RSLANG_BUILD_STAGE "2" CACHE STRING "Stage to build (see --stage)")
+set(RSLANG_CONFIG ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/config.toml CACHE STRING "Path to Rust config file")
+set(RSLANG_BUILD_TOOLS "<none>" CACHE STRING "Rust tools to build (see build.tools)")
 
 include(TargetArchitecture)
 include(CircuitCompile)
@@ -89,10 +93,10 @@ add_subdirectory(libs/stdlib)
 
 install(FILES cmake/CircuitCompile.cmake DESTINATION share/zkllvm)
 
-find_program(GIT_EXE git)
+find_package(Git REQUIRED)
 
 if(NOT ZKLLVM_VERSION)
-    execute_process(COMMAND ${GIT_EXE} describe --tags HEAD
+    execute_process(COMMAND ${GIT_EXECUTABLE} describe --tags HEAD
                     OUTPUT_VARIABLE DESCRIBE_OUTBUT
                     OUTPUT_STRIP_TRAILING_WHITESPACE
                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -126,17 +130,18 @@ endif()
 set(CPACK_GENERATOR DEB)
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "=nil; Foundation")
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "zkllvm-stdlib, libstdc++-9-dev")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "zkllvm-stdlib, build-essential")
 set(CPACK_PACKAGE_VERSION "${ZKLLVM_VERSION_MAJOR}.${ZKLLVM_VERSION_MINOR}.${ZKLLVM_VERSION_PATCH}")
 if(ZKLLVM_VERSION_INCREMENT)
     string(APPEND CPACK_PACKAGE_VERSION "-${ZKLLVM_VERSION_INCREMENT}")
 endif()
+set(CPACK_PACKAGING_INSTALL_PREFIX "/usr/lib/zkllvm")
+
+install(SCRIPT cmake/create-symlinks.cmake)
 
 include(CPack)
 
 add_subdirectories("${CMAKE_CURRENT_LIST_DIR}/bin")
-install(TARGETS assigner RUNTIME DESTINATION bin)
-install(TARGETS transpiler RUNTIME DESTINATION bin)
 
 # Package for stdlib
 add_custom_target(stdlib_package
@@ -156,59 +161,56 @@ if(NOT ${DETECT_PLATFORM_RESULT} EQUAL 0)
     message(FATAL_ERROR "Failed to detect host platform")
 endif()
 
-option(RSLANG_BUILD_EXTENDED "Build Rust tools (see build.extended)" FALSE)
-option(RSLANG_BUILD_TOOLS "Rust tools to build (see build.tools)" "")
-
-set(RSLANG_BUILD_STAGE "1" CACHE STRING "Stage to build (see --stage)")
-
 list(APPEND RSLANG_BUILD_ARGS --set llvm.download-ci-llvm=false)
 list(APPEND RSLANG_BUILD_ARGS --release-channel=nightly)
 list(APPEND RSLANG_BUILD_ARGS "--release-description=zkLLVM ${ZKLLVM_VERSION_MAJOR}.${ZKLLVM_VERSION_MINOR}.${ZKLLVM_VERSION_PATCH}")
 list(APPEND RSLANG_BUILD_ARGS --target=${RUSTC_HOST_TRIPLE},assigner-unknown-unknown)
 list(APPEND RSLANG_BUILD_ARGS --set target.${RUSTC_HOST_TRIPLE}.llvm-config=${CMAKE_CURRENT_BINARY_DIR}/libs/circifier/llvm/bin/llvm-config)
-list(APPEND RSLANG_BUILD_ARGS --set target.${RUSTC_HOST_TRIPLE}.llvm-filecheck=${CMAKE_CURRENT_BINARY_DIR}/libs/circifier/llvm/bin/FileCheck)
-list(APPEND RSLANG_BUILD_ARGS --set target.${RUSTC_HOST_TRIPLE}.llvm-has-rust-patches=false)
 list(APPEND RSLANG_BUILD_ARGS --set target.assigner-unknown-unknown.llvm-config=${CMAKE_CURRENT_BINARY_DIR}/libs/circifier/llvm/bin/llvm-config)
-list(APPEND RSLANG_BUILD_ARGS --set target.assigner-unknown-unknown.llvm-filecheck=${CMAKE_CURRENT_BINARY_DIR}/libs/circifier/llvm/bin/FileCheck)
-list(APPEND RSLANG_BUILD_ARGS --set target.assigner-unknown-unknown.llvm-has-rust-patches=false)
 list(APPEND RSLANG_BUILD_ARGS --set target.assigner-unknown-unknown.linker=llvm-link)
 if(${BUILD_SHARED_LIBS})
     list(APPEND RSLANG_BUILD_ARGS --enable-llvm-link-shared)
 endif()
 list(APPEND RSLANG_BUILD_ARGS --set build.build-dir=${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/build)
+list(APPEND RSLANG_BUILD_ARGS --set build.build-stage=${RSLANG_BUILD_STAGE})
 list(APPEND RSLANG_BUILD_ARGS --set build.cargo=${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/target/release/cargo)
-list(APPEND RSLANG_BUILD_ARGS --disable-docs)
 if(${RSLANG_BUILD_EXTENDED})
     list(APPEND RSLANG_BUILD_ARGS --enable-extended)
-    if(RSLANG_BUILD_TOOLS)
+    if(NOT RSLANG_BUILD_TOOLS STREQUAL "<none>")
         list(APPEND RSLANG_BUILD_ARGS --tools=${RSLANG_BUILD_TOOLS})
     endif()
+else()
+    list(APPEND RSLANG_BUILD_ARGS --disable-extended)
 endif()
 if(CMAKE_BUILD_TYPE MATCHES Debug)
     list(APPEND RSLANG_BUILD_ARGS --enable-debug)
 endif()
 list(APPEND RSLANG_BUILD_ARGS --dist-compression-formats=gz)
+# TODO: (aleasims) re-enable docs after fixing all errors:
+# Issue: https://github.com/NilFoundation/zkllvm-rslang/issues/74
+list(APPEND RSLANG_BUILD_ARGS --disable-docs)
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang)
+file(REMOVE ${RSLANG_CONFIG})
 execute_process(COMMAND ${CMAKE_CURRENT_LIST_DIR}/libs/rslang/configure ${RSLANG_BUILD_ARGS}
                 COMMAND_ERROR_IS_FATAL ANY
                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang)
 
 add_custom_target(cargo
-                  COMMAND cargo build --release --target-dir ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/target --package cargo
+                  COMMAND cargo build --release --target-dir ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/target
                   COMMENT "Building cargo"
                   USES_TERMINAL
-                  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/libs/rslang)
+                  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/libs/rslang/src/tools/cargo)
 
 add_custom_target(rslang
-                  COMMAND ./x build --config ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/config.toml --stage ${RSLANG_BUILD_STAGE}
+                  COMMAND ./x build --config ${RSLANG_CONFIG}
                   DEPENDS llvm-libraries llvm-config llvm-link FileCheck cargo
                   COMMENT "Building rslang"
                   USES_TERMINAL
                   WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/libs/rslang)
 
 add_custom_target(rslang_dist
-                  COMMAND ./x dist --config ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/config.toml
+                  COMMAND ./x dist --config ${RSLANG_CONFIG}
                   DEPENDS rslang
                   COMMENT "Building rslang distribution package"
                   USES_TERMINAL
