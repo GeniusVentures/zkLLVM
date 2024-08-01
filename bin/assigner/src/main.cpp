@@ -46,13 +46,16 @@
 
 #include <ios>
 
+#include <nil/crypto3/hash/sha2.hpp>
+#include <nil/crypto3/hash/poseidon.hpp>
+
 #include <nil/marshalling/status_type.hpp>
 #include <nil/marshalling/field_type.hpp>
 #include <nil/marshalling/endianness.hpp>
 #include <nil/crypto3/marshalling/zk/types/plonk/constraint_system.hpp>
 #include <nil/crypto3/marshalling/zk/types/plonk/assignment_table.hpp>
 
-#include <nil/blueprint/parser.hpp>
+#include <nil/blueprint/assigner.hpp>
 #include <nil/blueprint/asserts.hpp>
 #include <nil/blueprint/utils/satisfiability_check.hpp>
 
@@ -68,15 +71,8 @@ void print_circuit(const circuit_proxy<ArithmetizationType> &circuit_proxy,
                    const assignment_proxy<ArithmetizationType> &table_proxy,
                    bool rename_required, std::ostream &out = std::cout) {
     using TTypeBase = nil::marshalling::field_type<Endianness>;
-    using plonk_constraint_system = nil::marshalling::types::bundle<
-        TTypeBase, std::tuple<
-                       nil::crypto3::marshalling::types::plonk_gates<TTypeBase, typename ConstraintSystemType::gates_container_type::value_type >,               // gates
-                       nil::crypto3::marshalling::types::plonk_copy_constraints<TTypeBase, typename ConstraintSystemType::field_type>,                           // copy constraints
-                       nil::crypto3::marshalling::types::plonk_lookup_gates<TTypeBase, typename ConstraintSystemType::lookup_gates_container_type::value_type>,  // lookup constraints
-                       // If we don't have lookup gates, we don't need lookup tables
-                       nil::crypto3::marshalling::types::plonk_lookup_tables< TTypeBase, typename ConstraintSystemType::lookup_tables_type::value_type >         // lookup tables
-                       >
-        >;
+    using value_marshalling_type =
+        nil::crypto3::marshalling::types::plonk_constraint_system<TTypeBase, ConstraintSystemType>;
     using AssignmentTableType = assignment_proxy<ArithmetizationType>;
     using variable_type = crypto3::zk::snark::plonk_variable<typename AssignmentTableType::field_type::value_type>;
 
@@ -133,7 +129,7 @@ void print_circuit(const circuit_proxy<ArithmetizationType> &circuit_proxy,
     }
 
     auto filled_val =
-        plonk_constraint_system(std::make_tuple(
+        value_marshalling_type(std::make_tuple(
             nil::crypto3::marshalling::types::fill_plonk_gates<Endianness, typename ConstraintSystemType::gates_container_type::value_type>(used_gates),
             nil::crypto3::marshalling::types::fill_plonk_copy_constraints<Endianness, typename ConstraintSystemType::variable_type>(used_copy_constraints),
             nil::crypto3::marshalling::types::fill_plonk_lookup_gates<Endianness, typename ConstraintSystemType::lookup_gates_container_type::value_type>(used_lookup_gates),
@@ -148,9 +144,8 @@ void print_circuit(const circuit_proxy<ArithmetizationType> &circuit_proxy,
 }
 
 enum class print_table_kind {
-    PRIVATE,
-    SHARED,
-    FULL
+    MULTI_PROVER,
+    SINGLE_PROVER
 };
 
 enum class print_column_kind {
@@ -175,7 +170,7 @@ void print_assignment_table(const assignment_proxy<ArithmetizationType> &table_p
     std::uint32_t usable_rows_amount;
     std::uint32_t total_columns;
     std::uint32_t total_size;
-    std::uint32_t shared_size = table_proxy.shareds_amount();
+    std::uint32_t shared_size = (print_kind == print_table_kind::MULTI_PROVER) ? 1 : 0;
     std::uint32_t public_input_size = table_proxy.public_inputs_amount();
     std::uint32_t witness_size = table_proxy.witnesses_amount();
     std::uint32_t constant_size = table_proxy.constants_amount();
@@ -191,7 +186,7 @@ void print_assignment_table(const assignment_proxy<ArithmetizationType> &table_p
         max_public_inputs_size = std::max(max_public_inputs_size, table_proxy.public_input_column_size(i));
     }
 
-    if (print_kind == print_table_kind::PRIVATE) {
+    if (print_kind == print_table_kind::MULTI_PROVER) {
         total_columns = witness_size + shared_size + public_input_size + constant_size + selector_size;
         std::uint32_t max_shared_size = 0;
         for (std::uint32_t i = 0; i < shared_size; i++) {
@@ -205,8 +200,8 @@ void print_assignment_table(const assignment_proxy<ArithmetizationType> &table_p
         }
         usable_rows_amount = table_proxy.get_used_rows().size();
         usable_rows_amount = std::max({usable_rows_amount, max_shared_size, max_public_inputs_size, max_constant_size, max_selector_size});
-    } else { // FULL
-        total_columns = AssignmentTableType::arithmetization_params::total_columns;
+    } else { // SINGLE_PROVER
+        total_columns = witness_size + shared_size + public_input_size + constant_size + selector_size;
         std::uint32_t max_witness_size = 0;
         for (std::uint32_t i = 0; i < witness_size; i++) {
             max_witness_size = std::max(max_witness_size, table_proxy.witness_column_size(i));
@@ -230,125 +225,144 @@ void print_assignment_table(const assignment_proxy<ArithmetizationType> &table_p
     total_size = padded_rows_amount * total_columns;
 
     using TTypeBase = nil::marshalling::field_type<Endianness>;
-    using plonk_assignment_table = nil::marshalling::types::bundle<
-        TTypeBase,
-        std::tuple<
-            nil::marshalling::types::integral<TTypeBase, std::size_t>, // usable_rows
-            nil::marshalling::types::integral<TTypeBase, std::size_t>, // columns_number
-            // table_values
-            nil::marshalling::types::array_list<
-                TTypeBase,
-                nil::crypto3::marshalling::types::field_element<TTypeBase, typename AssignmentTableType::field_type::value_type>,
-                nil::marshalling::option::sequence_size_field_prefix<nil::marshalling::types::integral<TTypeBase, std::size_t>>
-                >
-            >
-        >;
+    using table_value_marshalling_type =
+        nil::crypto3::marshalling::types::plonk_assignment_table<TTypeBase, AssignmentTableType>;
+
     using column_type = typename crypto3::zk::snark::plonk_column<BlueprintFieldType>;
 
-    std::vector<typename AssignmentTableType::field_type::value_type> table_values(total_size, 0);
-    if (print_kind == print_table_kind::FULL) {
-        auto it = table_values.begin();
+    std::vector<typename AssignmentTableType::field_type::value_type> table_witness_values(     padded_rows_amount * witness_size ,     0);
+    std::vector<typename AssignmentTableType::field_type::value_type> table_public_input_values(padded_rows_amount * (public_input_size + shared_size), 0);
+    std::vector<typename AssignmentTableType::field_type::value_type> table_constant_values(    padded_rows_amount * constant_size,     0);
+    std::vector<typename AssignmentTableType::field_type::value_type> table_selector_values(    padded_rows_amount * selector_size,     0);
+    if (print_kind == print_table_kind::SINGLE_PROVER) {
+        auto it = table_witness_values.begin();
         for (std::uint32_t i = 0; i < witness_size; i++) {
             fill_vector_value<typename AssignmentTableType::field_type::value_type, column_type>
-                (table_values, table_proxy.witness(i), it);
+                (table_witness_values, table_proxy.witness(i), it);
             it += padded_rows_amount;
         }
+        it = table_public_input_values.begin();
         for (std::uint32_t i = 0; i < public_input_size; i++) {
             fill_vector_value<typename AssignmentTableType::field_type::value_type, column_type>
-                (table_values, table_proxy.public_input(i), it);
+                (table_public_input_values, table_proxy.public_input(i), it);
             it += padded_rows_amount;
         }
+        it = table_constant_values.begin();
         for (std::uint32_t i = 0; i < constant_size; i++) {
             fill_vector_value<typename AssignmentTableType::field_type::value_type, column_type>
-                (table_values, table_proxy.constant(i), it);
+                (table_constant_values, table_proxy.constant(i), it);
             it += padded_rows_amount;
         }
+        it = table_selector_values.begin();
         for (std::uint32_t i = 0; i < selector_size; i++) {
             fill_vector_value<typename AssignmentTableType::field_type::value_type, column_type>
-                (table_values, table_proxy.selector(i), it);
+                (table_selector_values, table_proxy.selector(i), it);
             it += padded_rows_amount;
         }
     } else {
         const auto& rows = table_proxy.get_used_rows();
         const auto& selector_rows = table_proxy.get_used_selector_rows();
-        const std::uint32_t padding = padded_rows_amount - rows.size();
-        std::uint32_t idx = 0;
-        auto it = table_values.begin();
+        std::uint32_t witness_idx = 0;
         // witness
-        for( std::size_t i = 0; i < AssignmentTableType::arithmetization_params::witness_columns; i++ ){
+        for( std::size_t i = 0; i < witness_size; i++ ){
             const auto column_size = table_proxy.witness_column_size(i);
             std::uint32_t offset = 0;
             for(const auto& j : rows){
                 if (j < column_size) {
-                    table_values[idx + offset] = table_proxy.witness(i, j);
+                    table_witness_values[witness_idx + offset] = table_proxy.witness(i, j);
                     offset++;
                 }
             }
-            idx += padded_rows_amount;
+            witness_idx += padded_rows_amount;
         }
         // public input
-        it += idx;
+        std::uint32_t pub_inp_idx = 0;
+        auto it_pub_inp = table_public_input_values.begin();
         for (std::uint32_t i = 0; i < public_input_size; i++) {
             fill_vector_value<typename AssignmentTableType::field_type::value_type, column_type>
-                (table_values, table_proxy.public_input(i), it);
-            it += padded_rows_amount;
-            idx += padded_rows_amount;
+                (table_public_input_values, table_proxy.public_input(i), it_pub_inp);
+            it_pub_inp += padded_rows_amount;
+            pub_inp_idx += padded_rows_amount;
         }
         for (std::uint32_t i = 0; i < shared_size; i++) {
             fill_vector_value<typename AssignmentTableType::field_type::value_type, column_type>
-                (table_values, table_proxy.shared(i), it);
-            it += padded_rows_amount;
-            idx += padded_rows_amount;
+                (table_public_input_values, table_proxy.shared(i), it_pub_inp);
+            it_pub_inp += padded_rows_amount;
+            pub_inp_idx += padded_rows_amount;
         }
         // constant
+        std::uint32_t constant_idx = 0;
         for (std::uint32_t i = 0; i < ComponentConstantColumns; i++) {
             const auto column_size = table_proxy.constant_column_size(i);
             std::uint32_t offset = 0;
             for(const auto& j : rows){
                 if (j < column_size) {
-                    table_values[idx + offset] = table_proxy.constant(i, j);
+                    table_constant_values[constant_idx + offset] = table_proxy.constant(i, j);
                     offset++;
                 }
             }
-            idx += padded_rows_amount;
+
+            constant_idx += padded_rows_amount;
         }
-        it += idx;
+
+        auto it_const = table_constant_values.begin() + constant_idx;
         for (std::uint32_t i = ComponentConstantColumns; i < constant_size; i++) {
             fill_vector_value<typename AssignmentTableType::field_type::value_type, column_type>
-                (table_values, table_proxy.constant(i), it);
-            it += padded_rows_amount;
-            idx += padded_rows_amount;
+                (table_constant_values, table_proxy.constant(i), it_const);
+            it_const += padded_rows_amount;
+            constant_idx += padded_rows_amount;
         }
         // selector
+        std::uint32_t selector_idx = 0;
         for (std::uint32_t i = 0; i < ComponentSelectorColumns; i++) {
             const auto column_size = table_proxy.selector_column_size(i);
             std::uint32_t offset = 0;
             for(const auto& j : rows){
                 if (j < column_size) {
                     if (selector_rows.find(j) != selector_rows.end()) {
-                        table_values[idx + offset] = table_proxy.selector(i, j);
+
+                        table_selector_values[selector_idx + offset] = table_proxy.selector(i, j);
                     }
                     offset++;
                 }
             }
-            idx += padded_rows_amount;
+            selector_idx += padded_rows_amount;
         }
+
+        auto it_selector = table_selector_values.begin();
         for (std::uint32_t i = ComponentSelectorColumns; i < selector_size; i++) {
             fill_vector_value<typename AssignmentTableType::field_type::value_type, column_type>
-                (table_values, table_proxy.selector(i), it);
-            it += padded_rows_amount;
-            idx += padded_rows_amount;
+                (table_selector_values, table_proxy.selector(i), it_selector);
+            it_selector += padded_rows_amount;
+            selector_idx += padded_rows_amount;
         }
-        ASSERT_MSG(idx == total_size, "Printed index not equal required assignment size" );
+        ASSERT_MSG(witness_idx + pub_inp_idx + constant_idx + selector_idx == total_size, "Printed index not equal required assignment size" );
     }
 
-    auto filled_val = plonk_assignment_table(std::make_tuple(
+    auto filled_val = table_value_marshalling_type(std::make_tuple(
+        nil::marshalling::types::integral<TTypeBase, std::size_t>(witness_size),
+        nil::marshalling::types::integral<TTypeBase, std::size_t>(public_input_size + shared_size),
+        nil::marshalling::types::integral<TTypeBase, std::size_t>(constant_size),
+        nil::marshalling::types::integral<TTypeBase, std::size_t>(selector_size),
         nil::marshalling::types::integral<TTypeBase, std::size_t>(usable_rows_amount),
-        nil::marshalling::types::integral<TTypeBase, std::size_t>(total_columns),
-        nil::crypto3::marshalling::types::fill_field_element_vector<typename AssignmentTableType::field_type::value_type, Endianness>(table_values)
-            ));
-    table_values.clear();
-    table_values.shrink_to_fit();
+        nil::marshalling::types::integral<TTypeBase, std::size_t>(padded_rows_amount),
+        nil::crypto3::marshalling::types::fill_field_element_vector<typename AssignmentTableType::field_type::value_type, Endianness>(table_witness_values),
+        nil::crypto3::marshalling::types::fill_field_element_vector<typename AssignmentTableType::field_type::value_type, Endianness>(table_public_input_values),
+        nil::crypto3::marshalling::types::fill_field_element_vector<typename AssignmentTableType::field_type::value_type, Endianness>(table_constant_values),
+        nil::crypto3::marshalling::types::fill_field_element_vector<typename AssignmentTableType::field_type::value_type, Endianness>(table_selector_values)
+    ));
+
+    table_witness_values.clear();
+    table_witness_values.shrink_to_fit();
+
+    table_public_input_values.clear();
+    table_public_input_values.shrink_to_fit();
+
+    table_constant_values.clear();
+    table_constant_values.shrink_to_fit();
+
+    table_selector_values.clear();
+    table_selector_values.shrink_to_fit();
 
     std::vector<std::uint8_t> cv;
     cv.resize(filled_val.length(), 0x00);
@@ -392,180 +406,226 @@ bool read_json(
     return true;
 }
 
+struct ParametersPolicy {
+    constexpr static const std::size_t WitnessColumns = WITNESS_COLUMNS;
+    constexpr static const std::size_t PublicInputColumns = PUBLIC_INPUT_COLUMNS;
+    constexpr static const std::size_t ComponentConstantColumns = COMPONENT_CONSTANT_COLUMNS;
+    constexpr static const std::size_t LookupConstantColumns = LOOKUP_CONSTANT_COLUMNS;
+    constexpr static const std::size_t ComponentSelectorColumns = COMPONENT_SELECTOR_COLUMNS;
+    constexpr static const std::size_t LookupSelectorColumns = LOOKUP_SELECTOR_COLUMNS;
+};
+
 template<typename BlueprintFieldType>
 int curve_dependent_main(std::string bytecode_file_name,
                           std::string public_input_file_name,
                           std::string private_input_file_name,
                           std::string assignment_table_file_name,
                           std::string circuit_file_name,
+                          std::string processed_public_input_file_name,
                           long stack_size,
                           bool check_validity,
                           boost::log::trivial::severity_level log_level,
                           const std::string &policy,
+                          nil::blueprint::generation_mode gen_mode,
                           std::uint32_t max_num_provers,
+                          std::uint32_t max_lookup_rows,
                           std::uint32_t target_prover,
-                          nil::blueprint::print_format circuit_output_print_format) {
+                          nil::blueprint::print_format circuit_output_print_format,
+                          std::array<std::size_t, 6> column_sizes
+                          ) {
 
-    constexpr std::size_t ComponentConstantColumns = 5;
-    constexpr std::size_t LookupConstantColumns = 30;
-    constexpr std::size_t ComponentSelectorColumns = 30;
-    constexpr std::size_t LookupSelectorConstantColumns = 6;
+    const std::size_t ComponentConstantColumns = column_sizes[2];
+    const std::size_t LookupConstantColumns = column_sizes[3];
+    const std::size_t ComponentSelectorColumns = column_sizes[4];
+    const std::size_t LookupSelectorColumns = column_sizes[5];
 
-    constexpr std::size_t WitnessColumns = 15;
-    constexpr std::size_t PublicInputColumns = 1;
-    constexpr std::size_t ConstantColumns = ComponentConstantColumns + LookupConstantColumns;
-    constexpr std::size_t SelectorColumns = ComponentSelectorColumns + LookupSelectorConstantColumns;
+    const std::size_t WitnessColumns = column_sizes[0];
+    const std::size_t PublicInputColumns = column_sizes[1];
 
-    using ArithmetizationParams =
-        zk::snark::plonk_arithmetization_params<WitnessColumns, PublicInputColumns, ConstantColumns, SelectorColumns>;
-    using ConstraintSystemType = zk::snark::plonk_constraint_system<BlueprintFieldType, ArithmetizationParams>;
-    using ConstraintSystemProxyType = zk::snark::plonk_table<BlueprintFieldType, ArithmetizationParams, zk::snark::plonk_column<BlueprintFieldType>>;
+    const std::size_t ConstantColumns = ComponentConstantColumns + LookupConstantColumns;
+    const std::size_t SelectorColumns = ComponentSelectorColumns + LookupSelectorColumns;
+
+    zk::snark::plonk_table_description<BlueprintFieldType> desc(
+        WitnessColumns, PublicInputColumns, ConstantColumns, SelectorColumns);
+
+    using ConstraintSystemType = zk::snark::plonk_constraint_system<BlueprintFieldType>;
+    using ConstraintSystemProxyType = zk::snark::plonk_table<BlueprintFieldType, zk::snark::plonk_column<BlueprintFieldType>>;
     using ArithmetizationType =
-            crypto3::zk::snark::plonk_constraint_system<BlueprintFieldType, ArithmetizationParams>;
-    using AssignmentTableType = zk::snark::plonk_table<BlueprintFieldType, ArithmetizationParams, zk::snark::plonk_column<BlueprintFieldType>>;
+            crypto3::zk::snark::plonk_constraint_system<BlueprintFieldType>;
+    using AssignmentTableType = zk::snark::plonk_table<BlueprintFieldType, zk::snark::plonk_column<BlueprintFieldType>>;
 
-    std::vector<typename BlueprintFieldType::value_type> public_input;
     boost::json::value public_input_json_value;
-    ASSERT(read_json(public_input_file_name, public_input_json_value));
+    if(public_input_file_name.empty()) {
+        public_input_json_value = boost::json::array();
+    } else if (!read_json(public_input_file_name, public_input_json_value)){
+        return 1;
+    }
 
     boost::json::value private_input_json_value;
     if(private_input_file_name.empty()) {
         private_input_json_value = boost::json::array();
-    } else {
-        ASSERT(read_json(private_input_file_name, private_input_json_value));
+    } else if (!read_json(private_input_file_name, private_input_json_value)) {
+        return 1;
     }
 
-    nil::blueprint::parser<BlueprintFieldType, ArithmetizationParams> parser_instance(
+    nil::blueprint::assigner<BlueprintFieldType> assigner_instance(
+        desc,
         stack_size,
         log_level,
         max_num_provers,
         target_prover,
+        gen_mode,
         policy,
         circuit_output_print_format,
         check_validity
     );
 
-    std::unique_ptr<llvm::Module> module = parser_instance.parseIRFile(bytecode_file_name.c_str());
-    if (module == nullptr) {
+    if (!assigner_instance.parse_ir_file(bytecode_file_name.c_str())) {
+        return 1;
+    }
+    if (!processed_public_input_file_name.empty()) {
+        if (!assigner_instance.dump_public_input(public_input_json_value.as_array(), processed_public_input_file_name)) {
+            return 1;
+        }
+        return 0;
+    }
+
+    if (!assigner_instance.evaluate(public_input_json_value.as_array(), private_input_json_value.as_array())) {
         return 1;
     }
 
-    if (!parser_instance.evaluate(*module, public_input_json_value.as_array(), private_input_json_value.as_array())) {
-        return 1;
-    }
+    ASSERT_MSG(!assigner_instance.assignments.empty() && !assigner_instance.circuits.empty(), "Not found any proxy for prover" );
 
-    ASSERT_MSG(!parser_instance.assignments.empty() && !parser_instance.circuits.empty(), "Not found any proxy for prover" );
+    if (gen_mode.has_size_estimation()) {
+        return 0;
+    }
 
     // pack lookup tables
-    if (parser_instance.circuits[0].get_reserved_tables().size() > 0) {
+    if (assigner_instance.circuits[0].get_reserved_tables().size() > 0) {
         std::vector <std::size_t> lookup_columns_indices;
-        const std::uint32_t max_usable_rows = 500000;
         lookup_columns_indices.resize(LookupConstantColumns);
         // fill ComponentConstantColumns, ComponentConstantColumns + 1, ...
         std::iota(lookup_columns_indices.begin(), lookup_columns_indices.end(), ComponentConstantColumns);
+        // check if lookup selectors were not used
+        auto max_used_selector_idx = assigner_instance.assignments[0].selectors_amount() - 1;
+        while (max_used_selector_idx > 0) {
+            max_used_selector_idx--;
+            if (assigner_instance.assignments[0].selector(max_used_selector_idx).size() > 0) {
+                break;
+            }
+        }
+
+        ASSERT(max_used_selector_idx < ComponentSelectorColumns);
 
         auto usable_rows_amount = zk::snark::pack_lookup_tables_horizontal(
-                parser_instance.circuits[0].get_reserved_indices(),
-                parser_instance.circuits[0].get_reserved_tables(),
-                parser_instance.circuits[0].get(),
-                parser_instance.assignments[0].get(),
+                assigner_instance.circuits[0].get_reserved_indices(),
+                assigner_instance.circuits[0].get_reserved_tables(),
+                assigner_instance.circuits[0].get(),
+                assigner_instance.assignments[0].get(),
                 lookup_columns_indices,
-                ComponentSelectorColumns,
+                max_used_selector_idx + 1,
                 0,
-                max_usable_rows
+                max_lookup_rows
         );
     }
 
     constexpr std::uint32_t invalid_target_prover = std::numeric_limits<std::uint32_t>::max();
     // print assignment tables and circuits
-    ASSERT_MSG(parser_instance.assignments.size() == parser_instance.circuits.size(), "Missmatch assignments circuits size");
-    if (parser_instance.assignments.size() == 1 && (target_prover == 0 || target_prover == invalid_target_prover)) {
+    ASSERT_MSG(assigner_instance.assignments.size() == assigner_instance.circuits.size(), "Missmatch assignments circuits size");
+    if (assigner_instance.assignments.size() == 1 && (target_prover == 0 || target_prover == invalid_target_prover)) {
         // print assignment table
-        std::ofstream otable;
-        otable.open(assignment_table_file_name, std::ios_base::binary | std::ios_base::out);
-        if (!otable) {
-            std::cout << "Something wrong with output " << assignment_table_file_name << std::endl;
-            return 1;
-        }
-
-        print_assignment_table<
-            nil::marshalling::option::big_endian,
-            ArithmetizationType, BlueprintFieldType
-            >(parser_instance.assignments[0], print_table_kind::FULL, ComponentConstantColumns,
-              ComponentSelectorColumns, otable);
-
-        otable.close();
-
-        // print assignment circuit
-        std::ofstream ocircuit;
-        ocircuit.open(circuit_file_name, std::ios_base::binary | std::ios_base::out);
-        if (!ocircuit) {
-            std::cout << "Something wrong with output " << circuit_file_name << std::endl;
-            return 1;
-        }
-
-        print_circuit<nil::marshalling::option::big_endian, ArithmetizationType, ConstraintSystemType>(
-            parser_instance.circuits[0], parser_instance.assignments[0], false, ocircuit);
-        ocircuit.close();
-    } else if (parser_instance.assignments.size() > 1 &&
-               (target_prover < parser_instance.assignments.size() || invalid_target_prover == invalid_target_prover)) {
-        std::uint32_t start_idx = (target_prover == invalid_target_prover) ? 0 : target_prover;
-        std::uint32_t end_idx = (target_prover == invalid_target_prover) ? parser_instance.assignments.size() : target_prover + 1;
-        for (std::uint32_t idx = start_idx; idx < end_idx; idx++) {
-            // print assignment table
+        if (gen_mode.has_assignments()) {
             std::ofstream otable;
-            otable.open(assignment_table_file_name + std::to_string(idx), std::ios_base::binary | std::ios_base::out);
+            otable.open(assignment_table_file_name, std::ios_base::binary | std::ios_base::out);
             if (!otable) {
-                std::cout << "Something wrong with output " << assignment_table_file_name + std::to_string(idx) << std::endl;
+                std::cout << "Something wrong with output " << assignment_table_file_name << std::endl;
                 return 1;
             }
 
-            print_assignment_table<
-                nil::marshalling::option::big_endian,
-                ArithmetizationType, BlueprintFieldType
-                >(parser_instance.assignments[idx], print_table_kind::PRIVATE, ComponentConstantColumns, ComponentSelectorColumns, otable);
+            print_assignment_table<nil::marshalling::option::big_endian, ArithmetizationType, BlueprintFieldType>(
+                assigner_instance.assignments[0], print_table_kind::SINGLE_PROVER, ComponentConstantColumns,
+                ComponentSelectorColumns, otable);
 
             otable.close();
+        }
 
-            // print assignment table
+        // print circuit
+        if (gen_mode.has_circuit()) {
             std::ofstream ocircuit;
-            ocircuit.open(circuit_file_name + std::to_string(idx), std::ios_base::binary | std::ios_base::out);
+            ocircuit.open(circuit_file_name, std::ios_base::binary | std::ios_base::out);
             if (!ocircuit) {
-                std::cout << "Something wrong with output " << circuit_file_name + std::to_string(idx) << std::endl;
+                std::cout << "Something wrong with output " << circuit_file_name << std::endl;
                 return 1;
             }
 
-            ASSERT_MSG(idx < parser_instance.circuits.size(), "Not found circuit");
             print_circuit<nil::marshalling::option::big_endian, ArithmetizationType, ConstraintSystemType>(
-                parser_instance.circuits[idx], parser_instance.assignments[idx], (idx > 0), ocircuit);
-
+                assigner_instance.circuits[0], assigner_instance.assignments[0], false, ocircuit);
             ocircuit.close();
+        }
+    } else if (assigner_instance.assignments.size() > 1 &&
+              (target_prover < assigner_instance.assignments.size() || target_prover == invalid_target_prover)) {
+        std::uint32_t start_idx = (target_prover == invalid_target_prover) ? 0 : target_prover;
+        std::uint32_t end_idx = (target_prover == invalid_target_prover) ? assigner_instance.assignments.size() : target_prover + 1;
+        for (std::uint32_t idx = start_idx; idx < end_idx; idx++) {
+            // print assignment table
+            if (gen_mode.has_assignments()) {
+                std::ofstream otable;
+                otable.open(assignment_table_file_name + std::to_string(idx),
+                            std::ios_base::binary | std::ios_base::out);
+                if (!otable) {
+                    std::cout << "Something wrong with output " << assignment_table_file_name + std::to_string(idx)
+                              << std::endl;
+                    return 1;
+                }
+
+                print_assignment_table<nil::marshalling::option::big_endian, ArithmetizationType, BlueprintFieldType>(
+                    assigner_instance.assignments[idx], print_table_kind::MULTI_PROVER, ComponentConstantColumns,
+                    ComponentSelectorColumns, otable);
+
+                otable.close();
+            }
+
+            // print circuit
+            if (gen_mode.has_circuit()) {
+                std::ofstream ocircuit;
+                ocircuit.open(circuit_file_name + std::to_string(idx), std::ios_base::binary | std::ios_base::out);
+                if (!ocircuit) {
+                    std::cout << "Something wrong with output " << circuit_file_name + std::to_string(idx) << std::endl;
+                    return 1;
+                }
+
+                ASSERT_MSG(idx < assigner_instance.circuits.size(), "Not found circuit");
+                print_circuit<nil::marshalling::option::big_endian, ArithmetizationType, ConstraintSystemType>(
+                    assigner_instance.circuits[idx], assigner_instance.assignments[idx], (idx > 0), ocircuit);
+
+                ocircuit.close();
+            }
         }
     } else {
         std::cout << "No data for print: target prover " << target_prover << ", actual number of provers "
-                  << parser_instance.assignments.size() << std::endl;
+                  << assigner_instance.assignments.size() << std::endl;
         return 1;
     }
 
-    if (check_validity){
-        if (parser_instance.assignments.size() == 1 && (target_prover == 0 || target_prover == invalid_target_prover)) {
-            ASSERT_MSG(nil::blueprint::is_satisfied(parser_instance.circuits[0].get(), parser_instance.assignments[0].get()),
+    if (check_validity && gen_mode.has_assignments() && gen_mode.has_circuit()) {
+        if (assigner_instance.assignments.size() == 1 && (target_prover == 0 || target_prover == invalid_target_prover)) {
+            ASSERT_MSG(nil::blueprint::is_satisfied(assigner_instance.circuits[0].get(), assigner_instance.assignments[0].get()),
                        "The circuit is not satisfied");
-        } else if (parser_instance.assignments.size() > 1 &&
-                   (target_prover < parser_instance.assignments.size() || invalid_target_prover == invalid_target_prover)) {
+        } else if (assigner_instance.assignments.size() > 1 &&
+                   (target_prover < assigner_instance.assignments.size() || target_prover == invalid_target_prover)) {
             //  check only for target prover if set
             std::uint32_t start_idx = (target_prover == invalid_target_prover) ? 0 : target_prover;
-            std::uint32_t end_idx = (target_prover == invalid_target_prover) ? parser_instance.assignments.size() : target_prover + 1;
+            std::uint32_t end_idx = (target_prover == invalid_target_prover) ? assigner_instance.assignments.size() : target_prover + 1;
             for (std::uint32_t idx = start_idx; idx < end_idx; idx++) {
-                parser_instance.assignments[idx].set_check(true);
+                assigner_instance.assignments[idx].set_check(true);
                 bool is_accessible =
-                    nil::blueprint::is_satisfied(parser_instance.circuits[idx], parser_instance.assignments[idx]);
-                parser_instance.assignments[idx].set_check(false);
+                    nil::blueprint::is_satisfied(assigner_instance.circuits[idx], assigner_instance.assignments[idx]);
+                assigner_instance.assignments[idx].set_check(false);
                 ASSERT_MSG(is_accessible, ("The circuit is not satisfied on prover " + std::to_string(idx)).c_str());
             }
         } else {
             std::cout << "No data for check: target prover " << target_prover << ", actual number of provers "
-                      << parser_instance.assignments.size() << std::endl;
+                      << assigner_instance.assignments.size() << std::endl;
             return 1;
         }
     }
@@ -586,6 +646,7 @@ int main(int argc, char *argv[]) {
             ("private-input,p", boost::program_options::value<std::string>(), "Private input file")
             ("assignment-table,t", boost::program_options::value<std::string>(), "Assignment table output file")
             ("circuit,c", boost::program_options::value<std::string>(), "Circuit output file")
+            ("input-column", boost::program_options::value<std::string>(), "Output file for public input column")
             ("elliptic-curve-type,e", boost::program_options::value<std::string>(), "Native elliptic curve type (pallas, vesta, ed25519, bls12381)")
             ("stack-size,s", boost::program_options::value<long>(), "Stack size in bytes")
             ("check", "Check satisfiability of the generated circuit")
@@ -593,8 +654,12 @@ int main(int argc, char *argv[]) {
             ("print_circuit_output", "deprecated, use \"-f\" instead")
             ("print-circuit-output-format,f", boost::program_options::value<std::string>(), "print output of the circuit (dec, hex)")
             ("policy", boost::program_options::value<std::string>(), "Policy for creating circuits. Possible values: default")
+            ("generate-type", boost::program_options::value<std::string>(), "Define generated output. Possible values: circuit, assignment, circuit-assignment, public-input-column, size_estimation(does not generate anything, just evaluates circuit size). Default value is circuit-assignment")
             ("max-num-provers", boost::program_options::value<int>(), "Maximum number of provers. Possible values >= 1")
-            ("target-prover", boost::program_options::value<int>(), "Assignment table and circuit will be generated only for defined prover. Possible values [0, max-num-provers)");
+            ("max-lookup-rows", boost::program_options::value<int>(), "Maximum number of lookup rows")
+            ("target-prover", boost::program_options::value<int>(), "Assignment table and circuit will be generated only for defined prover. Possible values [0, max-num-provers)")
+            ("column-sizes", boost::program_options::value<std::vector<std::size_t>>()->multitoken(), "Column sizes, 6 values: WitnessColumns, PublicInputColumns, ComponentConstantColumns, LookupConstantColumns, ComponentSelectorColumns, LookupSelectorColumns")
+            ;
     // clang-format on
 
 
@@ -621,7 +686,7 @@ int main(int argc, char *argv[]) {
 #define str(s) #s
         std::cout << xstr(ASSIGNER_VERSION) << std::endl;
 #else
-        std::cout << "undefined" << std::endl;
+        std::cout << "Version is not defined" << std::endl;
 #endif
         return 0;
     }
@@ -631,6 +696,7 @@ int main(int argc, char *argv[]) {
     std::string private_input_file_name;
     std::string assignment_table_file_name;
     std::string circuit_file_name;
+    std::string processed_public_input_file_name;
     std::string elliptic_curve;
     nil::blueprint::print_format circuit_output_print_format;
     std::string log_level;
@@ -644,34 +710,65 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (vm.count("public-input")) {
-        public_input_file_name = vm["public-input"].as<std::string>();
-    } else {
-        std::cerr << "Invalid command line argument - public input file name is not specified" << std::endl;
+    nil::blueprint::generation_mode gen_mode = nil::blueprint::generation_mode::assignments() | nil::blueprint::generation_mode::circuit();
+    if (vm.count("generate-type")) {
+        const auto generate_type = vm["generate-type"].as<std::string>();
+        if (generate_type == "circuit") {
+            gen_mode = nil::blueprint::generation_mode::circuit();
+        } else if (generate_type == "assignment") {
+            gen_mode = nil::blueprint::generation_mode::assignments();
+        } else if (generate_type == "size_estimation") {
+            gen_mode = nil::blueprint::generation_mode::size_estimation();
+        } else if (generate_type == "public-input-column") {
+            gen_mode = nil::blueprint::generation_mode::public_input_column();
+        } else if (generate_type != "circuit-assignment") {
+            std::cerr << "Invalid command line argument - generate-type. " << generate_type << " is wrong value." << std::endl;
+            std::cout << options_desc << std::endl;
+            return 1;
+        }
+    }
+
+    if (!vm.count("public-input") && !vm.count("private-input") && gen_mode.has_assignments()) {
+        std::cerr << "Both public and private input file names are not specified" << std::endl;
         std::cout << options_desc << std::endl;
         return 1;
+    }
+
+    if (gen_mode.has_public_input_column()) {
+        if (vm.count("input-column")) {
+            processed_public_input_file_name = vm["input-column"].as<std::string>();
+        } else {
+            std::cerr << "Expected \"--input-column\" argument with output file name" << std::endl;
+            return 1;
+        }
     }
 
     if (vm.count("private-input")) {
         private_input_file_name = vm["private-input"].as<std::string>();
-    } else {
-        private_input_file_name = "";
     }
 
-    if (vm.count("assignment-table")) {
-        assignment_table_file_name = vm["assignment-table"].as<std::string>();
-    } else {
-        std::cerr << "Invalid command line argument - assignment table file name is not specified" << std::endl;
-        std::cout << options_desc << std::endl;
-        return 1;
+    if (vm.count("public-input")) {
+        public_input_file_name = vm["public-input"].as<std::string>();
     }
 
-    if (vm.count("circuit")) {
-        circuit_file_name = vm["circuit"].as<std::string>();
-    } else {
-        std::cerr << "Invalid command line argument - circuit file name is not specified" << std::endl;
-        std::cout << options_desc << std::endl;
-        return 1;
+    if (gen_mode.has_assignments()) {
+        if (vm.count("assignment-table")) {
+            assignment_table_file_name = vm["assignment-table"].as<std::string>();
+        } else {
+            std::cerr << "Invalid command line argument - assignment table file name is not specified" << std::endl;
+            std::cout << options_desc << std::endl;
+            return 1;
+        }
+    }
+
+    if (gen_mode.has_circuit()) {
+        if (vm.count("circuit")) {
+            circuit_file_name = vm["circuit"].as<std::string>();
+        } else {
+            std::cerr << "Invalid command line argument - circuit file name is not specified" << std::endl;
+            std::cout << options_desc << std::endl;
+            return 1;
+        }
     }
 
     if (vm.count("elliptic-curve-type")) {
@@ -741,6 +838,16 @@ int main(int argc, char *argv[]) {
     if (vm.count("max-num-provers")) {
         max_num_provers = vm["max-num-provers"].as<int>();
         if (max_num_provers < 1) {
+            std::cerr << "Invalid command line argument --max-num-provers. " << max_num_provers << " is wrong value." << std::endl;
+            std::cout << options_desc << std::endl;
+            return 1;
+        }
+    }
+
+    std::uint32_t max_lookup_rows = 500000;
+    if (vm.count("max-lookup-rows")) {
+        max_lookup_rows = vm["max-lookup-rows"].as<int>();
+        if (max_lookup_rows < 1) {
             std::cerr << "Invalid command line argument - max-num-provers. " << max_num_provers << " is wrong value." << std::endl;
             std::cout << options_desc << std::endl;
             return 1;
@@ -779,6 +886,24 @@ int main(int argc, char *argv[]) {
         "Or use \"-f hex\", hex output format is also supported now\n"
     );
 
+    const std::size_t column_sizes_size = 6;
+    std::array<std::size_t, column_sizes_size> column_sizes = {
+        ParametersPolicy::WitnessColumns,
+        ParametersPolicy::PublicInputColumns,
+        ParametersPolicy::ComponentConstantColumns,
+        ParametersPolicy::LookupConstantColumns,
+        ParametersPolicy::ComponentSelectorColumns,
+        ParametersPolicy::LookupSelectorColumns
+    };
+
+    if (vm.count("column-sizes")) {
+        std::vector<std::size_t> column_sizes_vector = vm["column-sizes"].as<std::vector<std::size_t>>();
+        ASSERT_MSG(column_sizes_vector.size() == column_sizes_size, ("Column sizes amount must be exactly " + std::to_string(column_sizes_size) + ", but it is " + std::to_string(column_sizes_vector.size())).c_str());
+        for (std::size_t i = 0; i < column_sizes_size; i++) {
+            column_sizes[i] = column_sizes_vector[i];
+        }
+    }
+
     switch (curve_options[elliptic_curve]) {
         case 0: {
             return curve_dependent_main<typename algebra::curves::pallas::base_field_type>(
@@ -787,13 +912,18 @@ int main(int argc, char *argv[]) {
                                                                           private_input_file_name,
                                                                           assignment_table_file_name,
                                                                           circuit_file_name,
+                                                                          processed_public_input_file_name,
                                                                           stack_size,
                                                                           vm.count("check"),
                                                                           log_options[log_level],
                                                                           policy,
+                                                                          gen_mode,
                                                                           max_num_provers,
+                                                                          max_lookup_rows,
                                                                           target_prover,
-                                                                          circuit_output_print_format);
+                                                                          circuit_output_print_format,
+                                                                          column_sizes
+                                                                          );
             break;
         }
         case 1: {
@@ -811,13 +941,18 @@ int main(int argc, char *argv[]) {
                                                                           private_input_file_name,
                                                                           assignment_table_file_name,
                                                                           circuit_file_name,
+                                                                          processed_public_input_file_name,
                                                                           stack_size,
                                                                           vm.count("check"),
                                                                           log_options[log_level],
                                                                           policy,
+                                                                          gen_mode,
                                                                           max_num_provers,
+                                                                          max_lookup_rows,
                                                                           target_prover,
-                                                                          circuit_output_print_format);
+                                                                          circuit_output_print_format,
+                                                                          column_sizes
+                                                                          );
             break;
         }
     };

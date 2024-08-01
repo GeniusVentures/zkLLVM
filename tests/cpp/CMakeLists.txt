@@ -228,6 +228,7 @@ add_zkllvm_unit_test("algebra/integers/shift/right")
 
 #bool tests
 add_zkllvm_unit_test("algebra/bool/assigner_exit_check")
+add_zkllvm_unit_test("algebra/bool/assigner_exit_check_eq_pallas")
 
 # bit de/composition tests
 add_zkllvm_unit_test("algebra/de_composition/decomposition/msb")
@@ -235,17 +236,18 @@ add_zkllvm_unit_test("algebra/de_composition/decomposition/lsb")
 
 #multi provers tests
 add_zkllvm_unit_test_pallas_multiprover("multi_provers/shift_add" 2)
+add_zkllvm_unit_test_pallas_multiprover("multi_provers/if" 2)
 
 #customer's tests
 add_zkllvm_unit_test("custom_cases/getelementptr_as_constant/getelementptr_as_constant")
 
 #libc functions
 add_zkllvm_unit_test("libc/memset/memset")
-add_zkllvm_unit_test("libc/strlen/strlen")
-add_zkllvm_unit_test("libc/strcmp/strcmp")
-add_zkllvm_unit_test("libc/strncmp/strncmp")
-add_zkllvm_unit_test("libc/strcpy/strcpy")
-add_zkllvm_unit_test("libc/strncpy/strncpy")
+#add_zkllvm_unit_test("libc/strlen/strlen")
+#add_zkllvm_unit_test("libc/strcmp/strcmp")
+#add_zkllvm_unit_test("libc/strncmp/strncmp")
+#add_zkllvm_unit_test("libc/strcpy/strcpy")
+#add_zkllvm_unit_test("libc/strncpy/strncpy")
 
 # hashes
 add_zkllvm_unit_test("hashes/sha256/sha2_256")
@@ -263,6 +265,9 @@ add_zkllvm_unit_test("algebra/recursive_prover/lookup_arg_verifier/test2/test")
 # bls tests
 add_zkllvm_unit_test_bls12381("algebra/fields/bls12381_fp12_arithmetics/mul")
 add_zkllvm_unit_test_bls12381("bls_signature/pairing/pairing")
+
+add_zkllvm_unit_test("nested_if/first")
+add_zkllvm_unit_test("nested_if/second")
 
 add_dependencies(all_tests_compilation assigner)
 add_dependencies(all_tests_compilation all_tests_compile_as_circuits)

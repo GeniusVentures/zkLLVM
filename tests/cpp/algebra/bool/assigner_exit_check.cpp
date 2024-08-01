@@ -6,7 +6,12 @@
 
 #include <nil/crypto3/algebra/curves/pallas.hpp>
 
-[[circuit]] bool assert_equaluty(uint32_t a, uint32_t b) {
+using namespace nil::crypto3::algebra::curves;
+
+[[circuit]] bool assert_equaluty(
+    typename pallas::base_field_type::value_type a,
+    typename pallas::base_field_type::value_type b
+) {
 
     bool c = a == b;
 
@@ -34,8 +39,9 @@ int main (int argc, char *argv[]){
 
     boost::json::value input_json = read_boost_json(std::string(argv[1]));
 
-    uint32_t a = read_uint<uint32_t>(input_json, 0);
-    uint32_t b = read_uint<uint32_t>(input_json, 1);
+    using BlueprintFieldType = typename pallas::base_field_type;
+    typename BlueprintFieldType::value_type a = read_field <BlueprintFieldType>(input_json, 0);
+    typename BlueprintFieldType::value_type b = read_field <BlueprintFieldType>(input_json, 1);
 
     assert_equaluty(a, b);
     return 0;
