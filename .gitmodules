@@ -6,7 +6,7 @@
 	url = ../../NilFoundation/zkllvm-assigner.git
 [submodule "zkllvm-circifier"]
 	path = libs/circifier
-	url = ../../NilFoundation/zkllvm-circifier.git
+	url = ../../GeniusVentures/zkllvm-circifier.git
 [submodule "zkllvm-blueprint"]
 	path = libs/blueprint
 	url = ../../NilFoundation/zkllvm-blueprint.git
