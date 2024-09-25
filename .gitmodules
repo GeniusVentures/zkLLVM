@@ -12,7 +12,7 @@
 	url = ../../NilFoundation/zkllvm-blueprint.git
 [submodule "libs/stdlib"]
 	path = libs/stdlib
-	url = ../../NilFoundation/zkllvm-stdlib.git
+	url = ../../GeniusVentures/zkllvm-stdlib.git
 [submodule "libs/transpiler"]
 	path = libs/transpiler
 	url = ../../NilFoundation/zkllvm-transpiler.git
