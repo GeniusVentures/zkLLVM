@@ -3,7 +3,7 @@
 	url = ../../BoostCMake/cmake_modules.git
 [submodule "zkllvm-assigner"]
 	path = libs/assigner
-	url = ../../NilFoundation/zkllvm-assigner.git
+	url = ../../GeniusVentures/zkllvm-assigner.git
 [submodule "zkllvm-circifier"]
 	path = libs/circifier
 	url = ../../GeniusVentures/zkllvm-circifier.git
