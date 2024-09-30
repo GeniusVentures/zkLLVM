@@ -9,7 +9,7 @@
 	url = ../../GeniusVentures/zkllvm-circifier.git
 [submodule "zkllvm-blueprint"]
 	path = libs/blueprint
-	url = ../../NilFoundation/zkllvm-blueprint.git
+	url = ../../GeniusVentures/zkllvm-blueprint.git
 [submodule "libs/stdlib"]
 	path = libs/stdlib
 	url = ../../GeniusVentures/zkllvm-stdlib.git
