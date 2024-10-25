@@ -141,7 +141,9 @@ configure_file("${CMAKE_CURRENT_LIST_DIR}/cmake/zkllvm.conf.in"
                "${CMAKE_CURRENT_BINARY_DIR}/zkllvm.conf"
                NO_SOURCE_PERMISSIONS
                @ONLY)
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/zkllvm.conf" DESTINATION /etc/ld.so.conf.d)
+set(CMAKE_INSTALL_PREFIX "/etc/ld.so.conf.d" CACHE STRING "Default install path")
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/zkllvm.conf" DESTINATION ${CMAKE_INSTALL_PREFIX})
 
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${CMAKE_CURRENT_LIST_DIR}/cmake/triggers")
 set(CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION TRUE)
