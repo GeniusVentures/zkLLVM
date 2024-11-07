@@ -47,6 +47,10 @@ set(ZKLLVM_DEV_ENVIRONMENT TRUE)
 set(RSLANG_BUILD_STAGE "2" CACHE STRING "Stage to build (see --stage)")
 set(RSLANG_CONFIG ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/config.toml CACHE STRING "Path to Rust config file")
 set(RSLANG_BUILD_TOOLS "<none>" CACHE STRING "Rust tools to build (see build.tools)")
+set(ZKLLVM_BUILD_TRANSPILER_LIB TRUE CACHE BOOL "Build the transpiler library")
+set(ZKLLVM_BUILD_EXAMPLES TRUE CACHE BOOL "Build the examples folder")
+set(ZKLLVM_BUILD_STD_LIB TRUE CACHE BOOL "Build modified stdlib for circuit generation")
+set(ZKLLVM_BUILD_EXECUTABLES TRUE CACHE BOOL "Build the bin folder")
 
 include(TargetArchitecture)
 include(CircuitCompile)
@@ -79,17 +83,23 @@ add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libs/crypto3")
 
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libs/blueprint")
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libs/assigner")
-add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libs/transpiler")
+if (ZKLLVM_BUILD_TRANSPILER_LIB)
+    add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libs/transpiler")
+endif()
 
 set(LLVM_ENABLE_PROJECTS "clang" CACHE STRING "Additional llvm projects")
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libs/circifier/llvm")
 
-add_subdirectory(examples)
+if (ZKLLVM_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
 if(BUILD_TESTS)
   add_subdirectory(tests)
 endif()
 
-add_subdirectory(libs/stdlib)
+if (ZKLLVM_BUILD_STD_LIB)
+    add_subdirectory(libs/stdlib)
+endif()
 
 install(FILES cmake/CircuitCompile.cmake DESTINATION share/zkllvm)
 
@@ -154,7 +164,9 @@ install(SCRIPT cmake/create-symlinks.cmake)
 
 include(CPack)
 
-add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/bin")
+if (ZKLLVM_BUILD_EXECUTABLES)
+    add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/bin")
+endif()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
