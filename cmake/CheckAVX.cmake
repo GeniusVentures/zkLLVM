@@ -1,4 +1,5 @@
 include(CheckCXXSourceRuns)
+include(CheckCXXSourceCompiles)
 
 set(AVX_CODE "
 #include <immintrin.h>
@@ -66,7 +67,7 @@ macro(check_avx_type type flags)
     foreach(__FLAG ${flags})
         if(NOT CXX_${type}_FOUND)
             set(CMAKE_REQUIRED_FLAGS ${__FLAG})
-            check_cxx_source_runs("${${type}_CODE}" HAS_${type}_${__FLAG_I})
+            check_cxx_source_compiles("${${type}_CODE}" HAS_${type}_${__FLAG_I})
             if(HAS_${type}_${__FLAG_I})
                 set(CXX_${type}_FOUND TRUE CACHE BOOL "${type} support")
                 set(CXX_${type}_FLAGS "${__FLAG}" CACHE STRING "${type} flags")
