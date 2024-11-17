@@ -14,6 +14,10 @@ cmake_policy(SET CMP0028 NEW)
 cmake_policy(SET CMP0057 NEW)
 cmake_policy(SET CMP0063 NEW)
 
+if (ZKLLVM_BUILD_OSX_FAT_BINARY)
+    set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "OSX Target build architecture" FORCE)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake"
      "${CMAKE_CURRENT_LIST_DIR}/cmake/packages"
      "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/share/modules/cmake")
@@ -22,6 +26,7 @@ include(CMConfig)
 include(CMSetupVersion)
 
 cm_workspace(zkllvm)
+
 
 macro(cm_find_package NAME)
     if(NOT "${NAME}" MATCHES "^${CMAKE_WORKSPACE_NAME}_.*$" AND NOT "${NAME}" STREQUAL CM)
@@ -40,17 +45,19 @@ option(BUILD_TESTS "Build unit tests" FALSE)
 option(BUILD_DOCS "Build with configuring Doxygen documentation compiler" TRUE)
 option(CIRCUIT_BINARY_OUTPUT "Emit circuit IR as binary file" FALSE)
 option(RSLANG_BUILD_EXTENDED "Build Rust tools (see build.extended)" FALSE)
+option(ZKLLVM_BUILD_RSLANG "Build Rust tools" TRUE)
 
-set(BUILD_WITH_TARGET_ARCHITECTURE "" CACHE STRING "Target build architecture")
+set(BUILD_WITH_TARGET_ARCHITECTURE "assigner" CACHE STRING "Target build architecture")
 set(DOXYGEN_OUTPUT_DIR "${CMAKE_CURRENT_LIST_DIR}/docs" CACHE STRING "Specify doxygen output directory")
 set(ZKLLVM_DEV_ENVIRONMENT TRUE)
 set(RSLANG_BUILD_STAGE "2" CACHE STRING "Stage to build (see --stage)")
 set(RSLANG_CONFIG ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/config.toml CACHE STRING "Path to Rust config file")
 set(RSLANG_BUILD_TOOLS "<none>" CACHE STRING "Rust tools to build (see build.tools)")
-set(ZKLLVM_BUILD_TRANSPILER_LIB TRUE CACHE BOOL "Build the transpiler library")
-set(ZKLLVM_BUILD_EXAMPLES TRUE CACHE BOOL "Build the examples folder")
-set(ZKLLVM_BUILD_STD_LIB TRUE CACHE BOOL "Build modified stdlib for circuit generation")
-set(ZKLLVM_BUILD_EXECUTABLES TRUE CACHE BOOL "Build the bin folder")
+set(ZKLLVM_BUILD_TRANSPILER_LIB FALSE CACHE BOOL "Build the transpiler library")
+set(ZKLLVM_BUILD_EXAMPLES FALSE CACHE BOOL "Build the examples folder")
+set(ZKLLVM_BUILD_STD_LIB FALSE CACHE BOOL "Build modified stdlib for circuit generation")
+set(ZKLLVM_BUILD_EXECUTABLES FALSE CACHE BOOL "Build the bin folder")
+set(LLVM_TARGETS_TO_BUILD "assigner" CACHE STRING "Build the assigner only")
 
 include(TargetArchitecture)
 include(CircuitCompile)
@@ -170,6 +177,7 @@ endif()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
+if (ZKLLVM_BUILD_RSLANG)
 message(STATUS "Configuring rslang")
 
 execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/detect-platform.py
@@ -235,3 +243,4 @@ add_custom_target(rslang_dist
                   COMMENT "Building rslang distribution package"
                   USES_TERMINAL
                   WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/libs/rslang)
+endif()
