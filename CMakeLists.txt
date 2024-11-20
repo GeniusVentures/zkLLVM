@@ -15,7 +15,7 @@ cmake_policy(SET CMP0057 NEW)
 cmake_policy(SET CMP0063 NEW)
 
 if (ZKLLVM_BUILD_OSX_FAT_BINARY)
-    set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "OSX Target build architecture" FORCE)
+    set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake"
@@ -53,12 +53,12 @@ set(ZKLLVM_DEV_ENVIRONMENT TRUE)
 set(RSLANG_BUILD_STAGE "2" CACHE STRING "Stage to build (see --stage)")
 set(RSLANG_CONFIG ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/config.toml CACHE STRING "Path to Rust config file")
 set(RSLANG_BUILD_TOOLS "<none>" CACHE STRING "Rust tools to build (see build.tools)")
-set(ZKLLVM_BUILD_TRANSPILER_LIB FALSE CACHE BOOL "Build the transpiler library")
-set(ZKLLVM_BUILD_EXAMPLES FALSE CACHE BOOL "Build the examples folder")
-set(ZKLLVM_BUILD_STD_LIB FALSE CACHE BOOL "Build modified stdlib for circuit generation")
-set(ZKLLVM_BUILD_EXECUTABLES FALSE CACHE BOOL "Build the bin folder")
+set(ZKLLVM_BUILD_TRANSPILER_LIB TRUE CACHE BOOL "Build the transpiler library")
+set(ZKLLVM_BUILD_EXAMPLES TRUE CACHE BOOL "Build the examples folder")
+set(ZKLLVM_BUILD_STD_LIB TRUE CACHE BOOL "Build modified stdlib for circuit generation")
+set(ZKLLVM_BUILD_EXECUTABLES TRUE CACHE BOOL "Build the bin folder")
 set(LLVM_TARGETS_TO_BUILD "Assigner" CACHE STRING "Build the assigner only")
-#set(LLVM_EXPERIMENTAL_TARGETS_TO_BUILD "crypto3" CACHE STRING "Build the assigner only")
+
 
 include(TargetArchitecture)
 include(CircuitCompile)
