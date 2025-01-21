@@ -24,14 +24,7 @@ jobs:
       - name: Install Windows host dependencies
         run: |
           choco install ccache -A
-
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - name: Checkout zkLLVM repository 
-        uses: actions/checkout@v3
-        with:
-          path: 'zkLLVM'
-          submodules: "recursive"
-      
+          
       - name: Install GitHub CLI
         run: |
           choco install gh
@@ -40,15 +33,29 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
+      - name: Define Release Tag
+        id: release-tag
+        run: echo "RELEASE_TAG=Windows-develop-Release" >> $GITHUB_ENV
+
       - name: Download Prebuilt Boost from Thirdparty
+        shell: bash
         run: |
           gh release download --repo GeniusVentures/thirdparty \
-            --tag ${{ steps.branch-name.outputs.current_branch || 'develop' }} \
+            --tag ${{ env.RELEASE_TAG }} \
             --name Boost-lib.tar.gz
 
       - name: Extract Prebuilt Boost
         run: |
           tar -xzvf Boost-lib.tar.gz -C ${{github.workspace}}/thirdparty/build/Windows/Release
+
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout zkLLVM repository 
+        uses: actions/checkout@v3
+        with:
+          path: 'zkLLVM'
+          submodules: "recursive"
+      
+
 
       - name: Create Build Directory
         run: cmake -E make_directory ${{github.workspace}}/zkLLVM/build/Windows/Release         
