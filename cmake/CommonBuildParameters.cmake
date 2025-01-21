@@ -47,12 +47,6 @@ set(_BOOST_CACHE_ARGS
     -DBoost_USE_STATIC_LIBS:BOOL=ON
     -DBoost_USE_STATIC_RUNTIME:BOOL=ON
 )
-message(STATUS "Boot ROOT: ${_BOOST_CACHE_ARGS}")
-
-# header only libraries must not be added here
-#find_package(Boost REQUIRED COMPONENTS date_time filesystem random regex system thread log log_setup program_options)
-#include_directories(${Boost_INCLUDE_DIRS})
-message(STATUS "Boot ROOT2: ${_BOOST_ROOT}")
 
 set(_ZKLLVM_EXTRA_PARAM
     -DZKLLVM_BUILD_TRANSPILER_LIB:BOOL=OFF
@@ -76,6 +70,7 @@ ExternalProject_Add(zkLLVM
     -DLLVM_ENABLE_ZSTD:BOOL=FALSE
     -DLLVM_INCLUDE_EXAMPLES:BOOL=OFF
     -DZKLLVM_BUILD_RSLANG:BOOL=FALSE
+    -DBUILD_SHARED_LIBS:BOOL=OFF
     ${_CMAKE_COMMON_CACHE_ARGS}
     ${_BOOST_CACHE_ARGS}
     ${_ZKLLVM_EXTRA_PARAM}
