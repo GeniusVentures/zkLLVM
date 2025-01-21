@@ -42,9 +42,9 @@ jobs:
         run: |
           gh release download \
             --repo GeniusVentures/thirdparty \
-            ${{ env.RELEASE_TAG }} \
+            Windows-develop-Release \
             --pattern Boost-lib.tar.gz
-            
+
       - name: Ensure Directory Exists
         run: |
           mkdir -p ${{github.workspace}}/thirdparty/build/Windows/Release
