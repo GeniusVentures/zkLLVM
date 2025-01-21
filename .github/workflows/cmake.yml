@@ -44,6 +44,10 @@ jobs:
             --repo GeniusVentures/thirdparty \
             ${{ env.RELEASE_TAG }} \
             --pattern Boost-lib.tar.gz
+            
+      - name: Ensure Directory Exists
+        run: |
+          mkdir -p ${{github.workspace}}/thirdparty/build/Windows/Release
 
       - name: Extract Prebuilt Boost
         run: |
