@@ -24,7 +24,7 @@ jobs:
       - name: Install Windows host dependencies
         run: |
           choco install ccache -A
-          
+
       - name: Install GitHub CLI
         run: |
           choco install gh
@@ -40,9 +40,10 @@ jobs:
       - name: Download Prebuilt Boost from Thirdparty
         shell: bash
         run: |
-          gh release download --repo GeniusVentures/thirdparty \
-            --tag ${{ env.RELEASE_TAG }} \
-            --name Boost-lib.tar.gz
+          gh release download \
+            --repo GeniusVentures/thirdparty \
+            ${{ env.RELEASE_TAG }} \
+            --pattern Boost-lib.tar.gz
 
       - name: Extract Prebuilt Boost
         run: |
