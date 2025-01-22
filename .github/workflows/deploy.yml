@@ -1,29 +1,29 @@
-name: Deploy ZKLLVM
+# name: Deploy ZKLLVM
 
-on:
-  workflow_run:
-    workflows: ["Release Build CI"]
-    types:
-      - completed
-env:
-  GH_TOKEN: ${{ secrets.GNUS_TOKEN_1 }}
+# on:
+#   workflow_run:
+#     workflows: ["Release Build CI"]
+#     types:
+#       - completed
+# env:
+#   GH_TOKEN: ${{ secrets.GNUS_TOKEN_1 }}
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
 
-    steps:
+#     steps:
       # - name: Download Linux Build Artifacts
       #   uses: actions/download-artifact@v3
       #   with:
       #     name: linux-build
       #     path: ${{github.workspace}}/linux-build
       
-      - name: Download Windows Build Artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: windows-build
-          path: ${{github.workspace}}/windows-build
+      # - name: Download Windows Build Artifacts
+      #   uses: actions/download-artifact@v3
+      #   with:
+      #     name: windows-build
+      #     path: ${{github.workspace}}/windows-build
 
       # - name: Download Android Build Artifacts
       #   uses: actions/download-artifact@v3
@@ -44,8 +44,8 @@ jobs:
       #     path: ${{github.workspace}}/ios-build
 
 
-      - name: Compress Windows Build Artifacts
-        run: tar -czvf windows-build.tar.gz -C ${{github.workspace}}/windows-build .
+      # - name: Compress Windows Build Artifacts
+      #   run: tar -czvf windows-build.tar.gz -C ${{github.workspace}}/windows-build .
 
       # - name: Compress Linux Build Artifacts
       #   run: tar -czvf linux-build.tar.gz -C ${{github.workspace}}/linux-build .
