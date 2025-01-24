@@ -152,7 +152,7 @@ jobs:
       - name: Install Linux host dependencies
         run: |
           sudo apt install ccache ninja-build -y
-          sudo apt install vulkan-tools vulkan-validationlayers-dev libvulkan-dev -y
+          sudo apt install vulkan-tools libvulkan-dev -y
           echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
 
       - name: Install GitHub CLI
@@ -299,7 +299,7 @@ jobs:
 
       - name: Extract Prebuilt Boost
         run: |
-          tar -xzvf Boost-lib.tar.gz -C ${{github.workspace}}/thirdparty/build/Android/Release
+          tar -xzvf Boost-lib.tar.gz -C ${{github.workspace}}/thirdparty/build/Android/Release/arm64-v8a
 
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
