@@ -273,7 +273,7 @@ jobs:
         id: branch-name
         uses: tj-actions/branch-names@v6
 
-       - name: Install GitHub CLI
+      - name: Install GitHub CLI
         run: |
           sudo apt install -y gh
 
