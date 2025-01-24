@@ -295,7 +295,7 @@ jobs:
 
       - name: Ensure Directory Exists
         run: |
-          mkdir -p ${{github.workspace}}/thirdparty/build/Android/Release
+          mkdir -p ${{github.workspace}}/thirdparty/build/Android/Release/arm64-v8a
 
       - name: Extract Prebuilt Boost
         run: |
