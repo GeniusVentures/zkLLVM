@@ -104,6 +104,16 @@ set(_CMAKE_COMMON_CACHE_ARGS ${_CMAKE_COMMON_CACHE_ARGS}
     -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY:STRING=BOTH
     -DOPENSSL_USE_STATIC_LIBS:BOOL=TRUE
 )
+set(_BOOST_CACHE_ARGS ${_BOOST_CACHE_ARGS}
+    -Dboost_atomic_DIR:PATH=${boost_atomic_DIR}
+    -Dboost_chrono_DIR:PATH=${boost_chrono_DIR}
+    -Dboost_container_DIR:PATH=${boost_container_DIR}
+    -Dboost_log_DIR:PATH=${boost_log_DIR}
+    -Dboost_log_setup_DIR:PATH=${boost_log_setup_DIR}
+    -Dboost_thread_DIR:PATH=${boost_thread_DIR}
+    -Dboost_unit_test_framework_DIR:PATH=${boost_unit_test_framework_DIR}
+    -DBoost_COMPILER:STRING=clang
+)
 endif()
 
 include(ExternalProject)
