@@ -132,7 +132,7 @@ endif()
 include(ExternalProject)
 ExternalProject_Add(zkLLVM
     PREFIX zkLLVM
-    SOURCE_DIR "${THIRDPARTY_DIR}/zkLLVM/"
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../zkLLVM/"
     CMAKE_GENERATOR ${CMAKE_GENERATOR}
     CONFIGURE_COMMAND
     ${CMAKE_COMMAND} <SOURCE_DIR>
