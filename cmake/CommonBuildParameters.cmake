@@ -58,7 +58,8 @@ if(APPLE OR WIN32 OR UNIX)
         -DLLVM_INCLUDE_UTILS:BOOL=OFF
         -DLLVM_INCLUDE_TESTS:BOOL=OFF
     )
-elseif(ANDROID OR IOS)
+endif()
+if(ANDROID OR IOS)
     # For mobile platforms (Android, iOS)
     set(_ZKLLVM_EXTRA_PARAM
         -DZKLLVM_BUILD_TRANSPILER_LIB:BOOL=OFF
