@@ -607,6 +607,7 @@ jobs:
           cd ${{github.workspace}}
           tar --exclude='zkLLVM/build/iOS/Release/zkLLVM/src' \
               --exclude='zkLLVM/build/iOS/Release/zkLLVM/tmp' \
+              --exclude='zkLLVM/build/iOS/Release/zkLLVM/Applications' \
               -czvf zkLLVM.tar.gz zkLLVM/
       
       - name: Set Release Variables
