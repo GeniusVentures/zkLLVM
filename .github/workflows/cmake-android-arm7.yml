@@ -1,9 +1,9 @@
-name: Release Build CI - Android Only
+name: Release Build CI - Android Arm7 Only
 on:
   workflow_dispatch:
 
 jobs:        
-  Android-arm64:
+  Android-arm7:
     runs-on: ubuntu-latest
     env:
       ANDROID_NDK_HOME: ${{github.workspace}}/android-ndk/android-ndk-r27b
@@ -33,7 +33,7 @@ jobs:
 
       - name: Define Release Tag
         id: release-tag
-        run: echo "RELEASE_TAG=Android-arm64-v8a-develop-Release" >> $GITHUB_ENV
+        run: echo "RELEASE_TAG=Android-armeabi-v7a-develop-Release" >> $GITHUB_ENV
 
       - name: Download Prebuilt Boost from Thirdparty
         shell: bash
@@ -45,11 +45,11 @@ jobs:
 
       - name: Ensure Directory Exists
         run: |
-          mkdir -p ${{github.workspace}}/thirdparty/build/Android/Release/arm64-v8a
+          mkdir -p ${{github.workspace}}/thirdparty/build/Android/Release/armeabi-v7a
 
       - name: Extract Prebuilt Boost
         run: |
-          tar -xzvf Boost-lib.tar.gz -C ${{github.workspace}}/thirdparty/build/Android/Release/arm64-v8a
+          tar -xzvf Boost-lib.tar.gz -C ${{github.workspace}}/thirdparty/build/Android/Release/armeabi-v7a
 
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
@@ -66,10 +66,10 @@ jobs:
           rm ndk.zip
       
       - name: Create Build Directory
-        run: cmake -E make_directory ${{github.workspace}}/zkLLVM/build/Android/Release/arm64-v8a           
+        run: cmake -E make_directory ${{github.workspace}}/zkLLVM/build/Android/Release/armeabi-v7a           
 
       - name: Configure CMake
-        working-directory: ${{github.workspace}}/zkLLVM/build/Android/Release/arm64-v8a    
+        working-directory: ${{github.workspace}}/zkLLVM/build/Android/Release/armeabi-v7a    
         run: |
           export ANDROID_NDK=${{env.ANDROID_NDK_HOME}}
           export ANDROID_NDK_HOME=${{env.ANDROID_NDK_HOME}}
@@ -81,14 +81,14 @@ jobs:
           echo "Check clang path:"
           which clang
           env
-          cmake -S ../../ -DANDROID_ABI="arm64-v8a" -DCMAKE_BUILD_TYPE=Release -DCMAKE_ANDROID_NDK=$ANDROID_NDK -DANDROID_TOOLCHAIN=clang -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty/
+          cmake -S ../../ -DANDROID_ABI="armeabi-v7a" -DCMAKE_BUILD_TYPE=Release -DCMAKE_ANDROID_NDK=$ANDROID_NDK -DANDROID_TOOLCHAIN=clang -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty/
       
       - name: Compile
-        working-directory: ${{github.workspace}}/zkLLVM/build/Android/Release/arm64-v8a 
+        working-directory: ${{github.workspace}}/zkLLVM/build/Android/Release/armeabi-v7a 
         run: make -j8
       
       - name: Install
-        working-directory: ${{github.workspace}}/zkLLVM/build/Android/Release/arm64-v8a 
+        working-directory: ${{github.workspace}}/zkLLVM/build/Android/Release/armeabi-v7a 
         run: cmake --install .
         
       - name: Compressing Build Artifacts
@@ -102,8 +102,8 @@ jobs:
           cd Android
           rm -rf !(Release) .[!.]* ..?*
           cd Release
-          rm -rf !(arm64-v8a) .[!.]* ..?*
-          cd arm64-v8a
+          rm -rf !(armeabi-v7a) .[!.]* ..?*
+          cd armeabi-v7a
           rm -rf !(zkLLVM) .[!.]* ..?*
           cd ${{github.workspace}}
           tar --exclude='zkLLVM/build/Android/Release/zkLLVM/src' \
@@ -114,7 +114,7 @@ jobs:
         id: vars
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
-          OS_NAME=Android-arm64-v8a
+          OS_NAME=Android-armeabi-v7a
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           BUILD_TYPE=Release
           FILE_NAME="${OS_NAME}-${BRANCH_NAME}-${BUILD_TYPE}.tar.gz"
