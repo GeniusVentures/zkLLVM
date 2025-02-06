@@ -64,8 +64,7 @@ jobs:
       - name: Configure macOS host
         if: ${{ runner.os == 'macOS'}}
         run: |
-          brew install ccache ninja bash
-          echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
+          brew install ccache bash
 
       - name: Add Android toolchain
         if: ${{ matrix.target == 'Android' }}
