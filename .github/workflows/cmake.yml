@@ -172,8 +172,8 @@ jobs:
           done
 
           cd $GITHUB_WORKSPACE
-          tar --exclude='zkLLVM/build/Windows/Release/zkLLVM/src' \
-              --exclude='zkLLVM/build/Windows/Release/zkLLVM/tmp' \
+          tar --exclude="zkLLVM/${BUILD_DIRECTORY}/zkLLVM/src" \
+              --exclude="zkLLVM/${BUILD_DIRECTORY}/zkLLVM/tmp" \
               -czvf zkLLVM.tar.gz zkLLVM/
 
       - name: Set Release Variables
