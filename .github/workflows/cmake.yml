@@ -64,7 +64,9 @@ jobs:
       - name: Configure macOS host
         if: ${{ runner.os == 'macOS'}}
         run: |
-          brew install ccache ninja bash
+          brew install ccache ninja bash gnu-tar
+          PATH="$HOMEBREW_PREFIX/opt/gnu-tar/libexec/gnubin:$PATH"
+          echo "PATH=$PATH" >> $GITHUB_ENV
           echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
 
       - name: Add Android toolchain
@@ -86,24 +88,21 @@ jobs:
           echo "BUILD_DIRECTORY=$BUILD_DIRECTORY" >> $GITHUB_ENV
         shell: bash
 
-      - name: Define Release Tag
-        shell: bash
-        run: |
-          if [ '${{matrix.abi}}' ]; then
-              RELEASE_TAG='${{matrix.target}}-${{matrix.abi}}-${{ github.ref_name }}-${{matrix.build-type}}'
-          else
-              RELEASE_TAG='${{matrix.target}}-${{ github.ref_name }}-${{matrix.build-type}}'
-          fi
-
-          echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_ENV
-
       - name: Download Prebuilt Boost from Thirdparty
         shell: bash
         run: |
-          if [ '${{matrix.abi}}' ]; then
-            thirdparty_tag='${{matrix.target}}-${{matrix.abi}}-develop-${{matrix.build-type}}'
+          if git ls-remote --heads https://github.com/GeniusVentures/thirdparty.git $current_branch | grep -q $current_branch; then
+              thirdparty_branch=${current_branch}
           else
-            thirdparty_tag='${{matrix.target}}-develop-${{matrix.build-type}}'
+              thirdparty_branch=develop
+          fi
+
+          echo "Using ${thirdparty_branch} for thirdparty"
+
+          if [ '${{matrix.abi}}' ]; then
+            thirdparty_tag="${{matrix.target}}-${{matrix.abi}}-${thirdparty_branch}-${{matrix.build-type}}"
+          else
+            thirdparty_tag="${{matrix.target}}-${thirdparty_branch}-${{matrix.build-type}}"
           fi
 
           gh release download \
@@ -157,27 +156,15 @@ jobs:
         working-directory: ${{github.workspace}}/zkLLVM/${{env.BUILD_DIRECTORY}}
         run: cmake --install .
 
-      - name: Compressing Build Artifacts
-        working-directory: ${{github.workspace}}/zkLLVM
+      - name: Compressing build artifacts
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.BUILD_DIRECTORY}}
         if: ${{github.event_name == 'workflow_dispatch'}}
         shell: bash
         run: |
-          shopt -s extglob
+          tar -czvf zkLLVM.tar.gz --transform 's|^|${{env.BUILD_DIRECTORY}}/|' zkLLVM
+          mv zkLLVM.tar.gz ${{github.workspace}}/zkLLVM.tar.gz
 
-          IFS='/' read -ra dirs <<< "$BUILD_DIRECTORY"
-
-          for dir in "${dirs[@]}"; do
-            rm -rf !($dir) .[!.]* ..?*
-            cd $dir
-          done
-
-          cd $GITHUB_WORKSPACE
-          tar --exclude="zkLLVM/${BUILD_DIRECTORY}/zkLLVM/src" \
-              --exclude="zkLLVM/${BUILD_DIRECTORY}/zkLLVM/tmp" \
-              -czvf zkLLVM.tar.gz zkLLVM/
-
-      - name: Set Release Variables
-        id: vars
+      - name: Release file
         shell: bash
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
@@ -187,38 +174,33 @@ jobs:
             OS_NAME=${{matrix.target}}
           fi
 
-          branch_name=${GITHUB_REF#refs/heads/}
-          build_type=Release
-          file_name="${OS_NAME}-${branch_name}-${build_type}.tar.gz"
+          if ${{github.event_name == 'pull_request'}}; then
+              branch_name=${{ github.event.pull_request.head.ref }}
+          else
+              branch_name=$GITHUB_REF_NAME
+          fi
 
-          echo "RELEASE_TAG=${OS_NAME}-${branch_name}-${build_type}-${GITHUB_SHA::7}" >> $GITHUB_ENV
-          echo "RELEASE_NAME=${OS_NAME} ${branch_name} ${build_type} (${GITHUB_SHA::7})" >> $GITHUB_ENV
-          echo "FILE_NAME=$file_name" >> $GITHUB_ENV
+          file_name="${OS_NAME}-${branch_name}-${{matrix.build-type}}.tar.gz"
+          RELEASE_TAG=${OS_NAME}-${branch_name}-${{matrix.build-type}}
 
-      - name: Rename Artifact
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        run: mv zkLLVM.tar.gz ${{ env.FILE_NAME }}
-        shell: bash
+          mv zkLLVM.tar.gz ${file_name}
 
-      - name: Create GitHub Release
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GNUS_TOKEN_1 }}
-        with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          release_name: ${{ env.RELEASE_NAME }}
-          draft: false
-          prerelease: false
+          if ! gh release view $RELEASE_TAG --repo GeniusVentures/zkLLVM; then
+              echo "Release not found, creating tag ${RELEASE_TAG}"
 
-      - name: Upload Release Asset
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GNUS_TOKEN_1 }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.FILE_NAME }}
-          asset_name: ${{ env.FILE_NAME }}
-          asset_content_type: application/gzip
+              if [ '${{matrix.build-type}}' != 'Release' ]; then
+                  RELEASE_TYPE="--prerelease"
+              else
+                  RELEASE_TYPE="--latest"
+              fi
+
+              gh release create ${RELEASE_TAG} \
+                  -n "${CURRENT_BRANCH} branch"  \
+                  --target "${CURRENT_BRANCH}" \
+                  ${RELEASE_TYPE} \
+                  --repo GeniusVentures/zkLLVM \
+                  -t "${{matrix.target}} ${{matrix.abi && format('({0}) ', matrix.abi) || ''}}${CURRENT_BRANCH} branch ${{matrix.build-type}} build"
+          fi
+          
+          echo "Uploading ${file_name}"
+          gh release upload ${RELEASE_TAG} ${file_name} --repo GeniusVentures/zkLLVM --clobber
