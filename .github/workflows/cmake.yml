@@ -26,11 +26,11 @@ jobs:
         abi: [""]
         include:
           - target: Android
-            host: ubuntu-latest
+            host: ubuntu-22.04
             abi: arm64-v8a
             build-type: Release
           - target: Android
-            host: ubuntu-latest
+            host: ubuntu-22.04
             abi: armeabi-v7a
             build-type: Release
           - target: iOS
@@ -38,7 +38,7 @@ jobs:
           - target: OSX
             host: macos-latest
           - target: Linux
-            host: ubuntu-latest
+            host: ubuntu-22.04
           - target: Windows
             host: windows-latest
         exclude:
