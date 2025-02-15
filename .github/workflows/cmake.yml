@@ -161,8 +161,20 @@ jobs:
         if: ${{github.event_name == 'workflow_dispatch'}}
         shell: bash
         run: |
-          tar -czvf zkLLVM.tar.gz --transform 's|^|${{env.BUILD_DIRECTORY}}/|' zkLLVM
-          mv zkLLVM.tar.gz ${{github.workspace}}/zkLLVM.tar.gz
+        tar --exclude="build/${{matrix.target}}/${{matrix.build-type}}/armeabi-v7a/zkLLVM/src" \
+            --exclude="build/${{matrix.target}}/${{matrix.build-type}}/armeabi-v7a/zkLLVM/tmp" \
+            --exclude="build/${{matrix.target}}/${{matrix.build-type}}/arm64-v8a/zkLLVM/src" \
+            --exclude="build/${{matrix.target}}/${{matrix.build-type}}/arm64-v8a/zkLLVM/tmp" \
+            --exclude="build/${{matrix.target}}/${{matrix.build-type}}/zkLLVM/src" \
+            --exclude="build/${{matrix.target}}/${{matrix.build-type}}/zkLLVM/tmp" \
+            -czvf zkLLVM.tar.gz \
+            --transform "s|^|${{env.BUILD_DIRECTORY}}/|" \
+            -C ${{github.workspace}}/zkLLVM ${{env.BUILD_DIRECTORY}}
+        if ($env:RUNNER_OS -eq "Windows") {
+          Move-Item -Path "zkLLVM.tar.gz" -Destination "$env:GITHUB_WORKSPACE\zkLLVM.tar.gz"
+        } else {
+          mv zkLLVM.tar.gz "${{ github.workspace }}/zkLLVM.tar.gz"
+        }
 
       - name: Release file
         shell: bash
