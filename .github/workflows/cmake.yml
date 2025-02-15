@@ -170,11 +170,16 @@ jobs:
             -czvf zkLLVM.tar.gz \
             --transform "s|^|${{env.BUILD_DIRECTORY}}/|" \
             -C ${{github.workspace}}/zkLLVM ${{env.BUILD_DIRECTORY}}
-        if ($env:RUNNER_OS -eq "Windows") {
-          Move-Item -Path "zkLLVM.tar.gz" -Destination "$env:GITHUB_WORKSPACE\zkLLVM.tar.gz"
-        } else {
-          mv zkLLVM.tar.gz "${{ github.workspace }}/zkLLVM.tar.gz"
-        }
+            
+      - name: Move Archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Move-Item -Path "zkLLVM.tar.gz" -Destination "$env:GITHUB_WORKSPACE\zkLLVM.tar.gz"
+    
+      - name: Move Archive (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: mv zkLLVM.tar.gz "${{ github.workspace }}/zkLLVM.tar.gz"
 
       - name: Release file
         shell: bash
