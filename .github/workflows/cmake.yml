@@ -161,16 +161,16 @@ jobs:
         if: ${{github.event_name == 'workflow_dispatch'}}
         shell: bash
         run: |
-        tar --exclude="build/${{matrix.target}}/${{matrix.build-type}}/armeabi-v7a/zkLLVM/src" \
-            --exclude="build/${{matrix.target}}/${{matrix.build-type}}/armeabi-v7a/zkLLVM/tmp" \
-            --exclude="build/${{matrix.target}}/${{matrix.build-type}}/arm64-v8a/zkLLVM/src" \
-            --exclude="build/${{matrix.target}}/${{matrix.build-type}}/arm64-v8a/zkLLVM/tmp" \
-            --exclude="build/${{matrix.target}}/${{matrix.build-type}}/zkLLVM/src" \
-            --exclude="build/${{matrix.target}}/${{matrix.build-type}}/zkLLVM/tmp" \
-            -czvf zkLLVM.tar.gz \
-            --transform "s|^|${{env.BUILD_DIRECTORY}}/|" \
-            -C ${{github.workspace}}/zkLLVM ${{env.BUILD_DIRECTORY}}
-            
+          tar --exclude="build/${{matrix.target}}/${{matrix.build-type}}/armeabi-v7a/zkLLVM/src" \
+              --exclude="build/${{matrix.target}}/${{matrix.build-type}}/armeabi-v7a/zkLLVM/tmp" \
+              --exclude="build/${{matrix.target}}/${{matrix.build-type}}/arm64-v8a/zkLLVM/src" \
+              --exclude="build/${{matrix.target}}/${{matrix.build-type}}/arm64-v8a/zkLLVM/tmp" \
+              --exclude="build/${{matrix.target}}/${{matrix.build-type}}/zkLLVM/src" \
+              --exclude="build/${{matrix.target}}/${{matrix.build-type}}/zkLLVM/tmp" \
+              -czvf zkLLVM.tar.gz \
+              --transform "s|^|${{env.BUILD_DIRECTORY}}/|" \
+              -C ${{github.workspace}}/zkLLVM ${{env.BUILD_DIRECTORY}}
+
       - name: Move Archive (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
