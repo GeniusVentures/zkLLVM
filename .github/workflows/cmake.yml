@@ -126,27 +126,27 @@ jobs:
       - name: Configure CMake for Android
         if: ${{ matrix.target == 'Android'}}
         working-directory: ${{github.workspace}}/zkLLVM
-        run: cmake -S build/${{matrix.target}} -B $BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DANDROID_ABI=${{matrix.abi}} -DCMAKE_ANDROID_NDK=${ANDROID_NDK_HOME}
+        run: cmake -S build/${{matrix.target}} -B $BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DANDROID_ABI=${{matrix.abi}} -DCMAKE_ANDROID_NDK=${ANDROID_NDK_HOME}
 
       - name: Configure CMake for iOS
         if: ${{ matrix.target == 'iOS'}}
         working-directory: ${{github.workspace}}/zkLLVM
-        run: cmake -S build/${{matrix.target}} -B $BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DPLATFORM=OS64
+        run: cmake -S build/${{matrix.target}} -B $BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DPLATFORM=OS64
 
       - name: Configure CMake for Mac
         if: ${{ matrix.target == 'OSX'}}
         working-directory: ${{github.workspace}}/zkLLVM
-        run: cmake -S build/${{matrix.target}} -B $BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DPLATFORM=MAC_UNIVERSAL
+        run: cmake -S build/${{matrix.target}} -B $BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DPLATFORM=MAC_UNIVERSAL
 
       - name: Configure CMake for Linux
         if: ${{ matrix.target == 'Linux' }}
         working-directory: ${{github.workspace}}/zkLLVM
-        run: cmake -S build/${{matrix.target}} -B $BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty
+        run: cmake -S build/${{matrix.target}} -B $BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty
 
       - name: Configure CMake for Windows
         if: ${{ matrix.target == 'Windows' }}
         working-directory: ${{github.workspace}}/zkLLVM
-        run: cmake -S build/${{matrix.target}} -B $env:BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -G "Visual Studio 17 2022" -A x64
+        run: cmake -S build/${{matrix.target}} -B $env:BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -G "Visual Studio 17 2022" -A x64
 
       - name: Build
         working-directory: ${{github.workspace}}/zkLLVM
