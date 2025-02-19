@@ -48,6 +48,8 @@ set(_BOOST_CACHE_ARGS
     -DBoost_USE_STATIC_RUNTIME:BOOL=ON
 )
 
+set(CMAKE_C_STANDARD "17" CACHE STRING "CMAKE C standard")
+
 if(APPLE OR WIN32 OR UNIX)
     # For desktop platforms (macOS, Windows, Linux)
     set(_ZKLLVM_EXTRA_PARAM
