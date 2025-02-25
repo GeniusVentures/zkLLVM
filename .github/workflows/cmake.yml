@@ -64,7 +64,7 @@ jobs:
       - name: Configure macOS host
         if: ${{ runner.os == 'macOS'}}
         run: |
-          brew install ccache ninja bash gnu-tar
+          brew install ccache ninja bash
           PATH="$HOMEBREW_PREFIX/opt/gnu-tar/libexec/gnubin:$PATH"
           echo "PATH=$PATH" >> $GITHUB_ENV
           echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
@@ -78,19 +78,35 @@ jobs:
 
           echo "ANDROID_NDK_HOME=$HOME/android-ndk-$NDK_VERSION" >> $GITHUB_ENV
 
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: zkLLVM
+          submodules: "recursive"
+
       - name: Set build directory
         run: |
           if [ '${{matrix.abi}}' ]; then
-            BUILD_DIRECTORY=build/${{matrix.target}}/${{matrix.build-type}}/${{matrix.abi}}
+            BUILD_DIRECTORY=${{matrix.build-type}}/${{matrix.abi}}
           else
-            BUILD_DIRECTORY=build/${{matrix.target}}/${{matrix.build-type}}
+            BUILD_DIRECTORY=${{matrix.build-type}}
           fi
+
+          echo "SOURCE_DIRECTORY=build/${{matrix.target}}" >> $GITHUB_ENV
           echo "BUILD_DIRECTORY=$BUILD_DIRECTORY" >> $GITHUB_ENV
         shell: bash
 
       - name: Download Prebuilt Boost from Thirdparty
         shell: bash
         run: |
+          if ${{github.event_name == 'pull_request'}}; then
+              current_branch=${{github.event.pull_request.head.ref}}
+          else
+              current_branch=$GITHUB_REF_NAME
+          fi
+
+          echo "CURRENT_BRANCH=${current_branch}" >>$GITHUB_ENV
+
           if git ls-remote --heads https://github.com/GeniusVentures/thirdparty.git $current_branch | grep -q $current_branch; then
               thirdparty_branch=${current_branch}
           else
@@ -110,74 +126,60 @@ jobs:
             ${thirdparty_tag} \
             --pattern Boost-lib.tar.gz
 
-          mkdir -p ${{github.workspace}}/thirdparty/${{env.BUILD_DIRECTORY}}
-
       - name: Extract Boost
+        shell: bash
         run: |
-          mkdir -p thirdparty/${{env.BUILD_DIRECTORY}}
-          tar -xzf Boost-lib.tar.gz -C thirdparty/${{env.BUILD_DIRECTORY}}
-
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          path: "zkLLVM"
-          submodules: "recursive"
+          thirdparty_path=thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}
+          mkdir -p ${thirdparty_path}
+          tar -xzf Boost-lib.tar.gz -C ${thirdparty_path}
 
       - name: Configure CMake for Android
         if: ${{ matrix.target == 'Android'}}
-        working-directory: ${{github.workspace}}/zkLLVM
-        run: cmake -S build/${{matrix.target}} -B $BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DANDROID_ABI=${{matrix.abi}} -DCMAKE_ANDROID_NDK=${ANDROID_NDK_HOME}
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DANDROID_ABI=${{matrix.abi}} -DCMAKE_ANDROID_NDK=${ANDROID_NDK_HOME}
 
       - name: Configure CMake for iOS
         if: ${{ matrix.target == 'iOS'}}
-        working-directory: ${{github.workspace}}/zkLLVM
-        run: cmake -S build/${{matrix.target}} -B $BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DPLATFORM=OS64
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DPLATFORM=OS64
 
       - name: Configure CMake for Mac
         if: ${{ matrix.target == 'OSX'}}
-        working-directory: ${{github.workspace}}/zkLLVM
-        run: cmake -S build/${{matrix.target}} -B $BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DPLATFORM=MAC_UNIVERSAL
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DPLATFORM=MAC_UNIVERSAL
 
       - name: Configure CMake for Linux
         if: ${{ matrix.target == 'Linux' }}
-        working-directory: ${{github.workspace}}/zkLLVM
-        run: cmake -S build/${{matrix.target}} -B $BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty
 
       - name: Configure CMake for Windows
         if: ${{ matrix.target == 'Windows' }}
-        working-directory: ${{github.workspace}}/zkLLVM
-        run: cmake -S build/${{matrix.target}} -B $env:BUILD_DIRECTORY -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -G "Visual Studio 17 2022" -A x64
+        working-directory: ${{github.workspace}}\zkLLVM
+        run: |
+          cd ${{env.SOURCE_DIRECTORY}}
+          cmake  -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}\thirdparty -G "Visual Studio 17 2022" -A x64
 
       - name: Build
-        working-directory: ${{github.workspace}}/zkLLVM
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
         run: cmake --build ${{env.BUILD_DIRECTORY}} --config ${{matrix.build-type}} -j
 
       - name: Install
-        working-directory: ${{github.workspace}}/zkLLVM/${{env.BUILD_DIRECTORY}}
-        run: cmake --install .
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
+        run: cmake --install ${{env.BUILD_DIRECTORY}}
 
-      - name: Compressing build artifacts
-        working-directory: ${{github.workspace}}/zkLLVM/${{env.BUILD_DIRECTORY}}
+      - name: Compress build artifacts
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}
         if: ${{github.event_name == 'workflow_dispatch'}}
         shell: bash
         run: |
           tar -czvf zkLLVM.tar.gz \
               --exclude='zkLLVM/src' \
               --exclude='zkLLVM/tmp' \
-              --transform "s|^|${{env.BUILD_DIRECTORY}}/|" \
+              --transform 's|^|${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/|S' \
               zkLLVM
 
-      - name: Move Archive (Windows)
-        working-directory: ${{github.workspace}}/zkLLVM/${{env.BUILD_DIRECTORY}}
-        if: ${{ github.event_name == 'workflow_dispatch' && runner.os == 'Windows' }}
-        shell: pwsh
-        run: Move-Item -Path "zkLLVM.tar.gz" -Destination "$env:GITHUB_WORKSPACE\zkLLVM.tar.gz"
-    
-      - name: Move Archive (Linux/macOS)
-        working-directory: ${{github.workspace}}/zkLLVM/${{env.BUILD_DIRECTORY}}
-        if: ${{ github.event_name == 'workflow_dispatch' && runner.os != 'Windows' }}
-        shell: bash
-        run: mv zkLLVM.tar.gz "${{ github.workspace }}/zkLLVM.tar.gz"
+          mv zkLLVM.tar.gz "${{github.workspace}}/zkLLVM.tar.gz"
 
       - name: Release file
         shell: bash
@@ -216,6 +218,6 @@ jobs:
                   --repo GeniusVentures/zkLLVM \
                   -t "${{matrix.target}} ${{matrix.abi && format('({0}) ', matrix.abi) || ''}}${CURRENT_BRANCH} branch ${{matrix.build-type}} build"
           fi
-          
+
           echo "Uploading ${file_name}"
           gh release upload ${RELEASE_TAG} ${file_name} --repo GeniusVentures/zkLLVM --clobber
