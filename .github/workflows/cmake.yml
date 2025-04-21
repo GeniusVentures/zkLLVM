@@ -39,10 +39,18 @@ jobs:
             host: macos-latest
           - target: Linux
             host: ubuntu-22.04
+            abi: x86_64
+            build-type: Release
+          - target: Linux
+            host: ubuntu-24.04-arm
+            abi: aarch64
+            build-type: Release
           - target: Windows
             host: windows-latest
         exclude:
           - target: Android
+            abi: ""
+          - target: Linux
             abi: ""
     steps:
       - name: Configure Linux host
@@ -151,7 +159,7 @@ jobs:
       - name: Configure CMake for Linux
         if: ${{ matrix.target == 'Linux' }}
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
-        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DABI_SUBFOLDER_NAME='/${{matrix.abi}}'
 
       - name: Configure CMake for Windows
         if: ${{ matrix.target == 'Windows' }}
