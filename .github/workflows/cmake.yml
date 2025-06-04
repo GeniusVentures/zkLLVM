@@ -104,69 +104,69 @@ jobs:
           echo "BUILD_DIRECTORY=$BUILD_DIRECTORY" >> $GITHUB_ENV
         shell: bash
 
-      - name: Download Prebuilt Boost from Thirdparty
-        shell: bash
+      - name: Download thirdparty release
+        working-directory: ${{github.workspace}}
         run: |
           if ${{github.event_name == 'pull_request'}}; then
-              current_branch=${{github.event.pull_request.head.ref}}
+              CURRENT_BRANCH=${{ github.event.pull_request.head.ref }}
           else
-              current_branch=$GITHUB_REF_NAME
+              CURRENT_BRANCH=$GITHUB_REF_NAME
           fi
 
-          echo "CURRENT_BRANCH=${current_branch}" >>$GITHUB_ENV
+          echo "Identified current branch as ${CURRENT_BRANCH}"
 
-          if git ls-remote --heads https://github.com/GeniusVentures/thirdparty.git $current_branch | grep -q $current_branch; then
-              thirdparty_branch=${current_branch}
+          echo "CURRENT_BRANCH=${CURRENT_BRANCH}" >>$GITHUB_ENV
+
+          if [ "$CURRENT_BRANCH" == "main" ]; then
+            thirdparty_branch="main"
           else
-              thirdparty_branch=develop
+            thirdparty_branch="develop"
           fi
 
           echo "Using ${thirdparty_branch} for thirdparty"
 
           if [ '${{matrix.abi}}' ]; then
-            thirdparty_tag="${{matrix.target}}-${{matrix.abi}}-${thirdparty_branch}-${{matrix.build-type}}"
+            FILE_NAME=${{matrix.target}}-${{matrix.abi}}-${{matrix.build-type}}.tar.gz
           else
-            thirdparty_tag="${{matrix.target}}-${thirdparty_branch}-${{matrix.build-type}}"
+            FILE_NAME=${{matrix.target}}-${{matrix.build-type}}.tar.gz
           fi
+          echo "FILE_NAME=${FILE_NAME}" >> $GITHUB_ENV
 
-          gh release download \
-            --repo GeniusVentures/thirdparty \
-            ${thirdparty_tag} \
-            --pattern Boost-lib.tar.gz
+          mkdir thirdparty
+          cd thirdparty
 
-      - name: Extract Boost
+          tag_name="${{matrix.target}}-${thirdparty_branch}-${{matrix.build-type}}"
+
+          gh release download ${tag_name} --repo GeniusVentures/thirdparty -p "${FILE_NAME}"
+          tar -zxf "${FILE_NAME}" ${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/boost
         shell: bash
-        run: |
-          thirdparty_path=thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}
-          mkdir -p ${thirdparty_path}
-          tar -xzf Boost-lib.tar.gz -C ${thirdparty_path}
 
       - name: Configure CMake for Android
         if: ${{ matrix.target == 'Android'}}
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
-        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DANDROID_ABI=${{matrix.abi}} -DCMAKE_ANDROID_NDK=${ANDROID_NDK_HOME}
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DANDROID_ABI=${{matrix.abi}} -DCMAKE_ANDROID_NDK=${ANDROID_NDK_HOME}
 
       - name: Configure CMake for iOS
         if: ${{ matrix.target == 'iOS'}}
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
-        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DPLATFORM=OS64
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DPLATFORM=OS64
 
       - name: Configure CMake for Mac
         if: ${{ matrix.target == 'OSX'}}
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
-        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DPLATFORM=MAC_UNIVERSAL
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DPLATFORM=MAC_UNIVERSAL
 
       - name: Configure CMake for Linux
         if: ${{ matrix.target == 'Linux' }}
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
-        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty -DABI_SUBFOLDER_NAME='/${{matrix.abi}}'
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DABI_SUBFOLDER_NAME='/${{matrix.abi}}'
 
       - name: Configure CMake for Windows
         if: ${{ matrix.target == 'Windows' }}
         working-directory: ${{github.workspace}}\zkLLVM
         run: |
           cd ${{env.SOURCE_DIRECTORY}}
-          cmake  -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}\thirdparty -G "Visual Studio 17 2022" -A x64
+          cmake  -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}\thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -G "Visual Studio 17 2022" -A x64
 
       - name: Build
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
@@ -178,54 +178,41 @@ jobs:
 
       - name: Compress build artifacts
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}
-        if: ${{github.event_name == 'workflow_dispatch'}}
+        if: github.ref_name == 'main' || github.ref_name == 'develop'
         shell: bash
         run: |
-          tar -czvf zkLLVM.tar.gz \
+          tar -czvf ${FILE_NAME} \
               --exclude='zkLLVM/src' \
               --exclude='zkLLVM/tmp' \
               --transform 's|^|${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/|S' \
               zkLLVM
 
-          mv zkLLVM.tar.gz "${{github.workspace}}/zkLLVM.tar.gz"
+          mv ${FILE_NAME} "${{github.workspace}}/zkLLVM/${FILE_NAME}"
 
       - name: Release file
+        if: github.ref_name == 'main' || github.ref_name == 'develop'
+        working-directory: ${{github.workspace}}/zkLLVM
         shell: bash
-        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
-          if [ '${{matrix.abi}}' ]; then
-            OS_NAME=${{matrix.target}}-${{matrix.abi}}
-          else
-            OS_NAME=${{matrix.target}}
-          fi
+          RELEASE_TAG='${{matrix.target}}-${{github.ref_name}}-${{matrix.build-type}}'
 
-          if ${{github.event_name == 'pull_request'}}; then
-              branch_name=${{ github.event.pull_request.head.ref }}
-          else
-              branch_name=$GITHUB_REF_NAME
-          fi
+          echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_ENV
 
-          file_name="${OS_NAME}-${branch_name}-${{matrix.build-type}}.tar.gz"
-          RELEASE_TAG=${OS_NAME}-${branch_name}-${{matrix.build-type}}
+          if ! gh release view $RELEASE_TAG; then
+              echo "Release not found, creating with tag: $RELEASE_TAG"
 
-          mv zkLLVM.tar.gz ${file_name}
-
-          if ! gh release view $RELEASE_TAG --repo GeniusVentures/zkLLVM; then
-              echo "Release not found, creating tag ${RELEASE_TAG}"
-
-              if [ '${{matrix.build-type}}' != 'Release' ]; then
+              if [ '${{ matrix.build-type }}' != 'Release' ]; then
                   RELEASE_TYPE="--prerelease"
               else
                   RELEASE_TYPE="--latest"
               fi
 
-              gh release create ${RELEASE_TAG} \
-                  -n "${CURRENT_BRANCH} branch"  \
+              gh release create $RELEASE_TAG \
+                  -n "${CURRENT_BRANCH} branch" \
                   --target "${CURRENT_BRANCH}" \
                   ${RELEASE_TYPE} \
-                  --repo GeniusVentures/zkLLVM \
-                  -t "${{matrix.target}} ${{matrix.abi && format('({0}) ', matrix.abi) || ''}}${CURRENT_BRANCH} branch ${{matrix.build-type}} build"
+                  -t "${{ matrix.target }} ${CURRENT_BRANCH} branch ${{ matrix.build-type }} build"
           fi
 
-          echo "Uploading ${file_name}"
-          gh release upload ${RELEASE_TAG} ${file_name} --repo GeniusVentures/zkLLVM --clobber
+          echo -e "Uploading ${FILE_NAME}"
+          gh release upload --clobber ${RELEASE_TAG} ${FILE_NAME}
