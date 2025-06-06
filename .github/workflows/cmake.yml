@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         target: [Android, iOS, OSX, Linux, Windows]
-        build-type: [Debug, Release]
+        build-type: [Release]
         abi: [""]
         include:
           - target: Android
@@ -41,10 +41,6 @@ jobs:
             host: ubuntu-22.04
             abi: x86_64
             build-type: Release
-          - target: Linux
-            host: ubuntu-22.04
-            abi: x86_64
-            build-type: Debug
           - target: Linux
             host: ubuntu-24.04-arm
             abi: aarch64
@@ -179,20 +175,6 @@ jobs:
       - name: Install
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
         run: cmake --install ${{env.BUILD_DIRECTORY}}
-
-      - name: Print install directory size
-        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/zkLLVM
-        if: runner.os != 'Windows'
-        run: du -sh .
-        shell: bash
-      
-      - name: Print install directory size (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          $path = "${{github.workspace}}\zkLLVM\${{env.SOURCE_DIRECTORY}}\${{env.BUILD_DIRECTORY}}\zkLLVM"
-          $size = (Get-ChildItem -Recurse -Force $path | Measure-Object -Property Length -Sum).Sum
-          "{0:N2} MB" -f ($size / 1MB)
-        shell: pwsh
 
       - name: Compress build artifacts
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}
