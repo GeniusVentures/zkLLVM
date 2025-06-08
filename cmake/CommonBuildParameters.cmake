@@ -166,7 +166,7 @@ ExternalProject_Add(zkLLVM
     ${_ZKLLVM_EXTRA_PARAM}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --config $<CONFIG>
-    INSTALL_COMMAND ${CMAKE_COMMAND} --install .
+    INSTALL_COMMAND ${CMAKE_COMMAND} --install . --config $<CONFIG>
 )
 
 if(EXT_ZKSTDLIB)
