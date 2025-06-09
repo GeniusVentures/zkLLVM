@@ -96,7 +96,10 @@ if (ZKLLVM_BUILD_TRANSPILER_LIB)
 endif()
 
 set(LLVM_ENABLE_PROJECTS "clang" CACHE STRING "Additional llvm projects")
-add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libs/circifier/llvm")
+
+if(NOT CMAKE_BUILD_TYPE MATCHES "[Dd]ebug")
+    add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libs/circifier/llvm")
+endif()
 
 if (ZKLLVM_BUILD_EXAMPLES)
     add_subdirectory(examples)
