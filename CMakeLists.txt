@@ -108,7 +108,7 @@ if(BUILD_TESTS)
   add_subdirectory(tests)
 endif()
 
-if (ZKLLVM_BUILD_STD_LIB)
+if (ZKLLVM_BUILD_STD_LIB AND NOT CMAKE_BUILD_TYPE MATCHES "[Dd]ebug")
     add_subdirectory(libs/stdlib)
 endif()
 
