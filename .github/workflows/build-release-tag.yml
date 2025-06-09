@@ -115,40 +115,41 @@ jobs:
 
           mkdir thirdparty
           cd thirdparty
+          pwd
 
           # Download from the tag's release
           echo "Downloading thirdparty from tag: ${TAG_NAME}"
 
           gh release download ${TAG_NAME} --repo GeniusVentures/thirdparty -p "${FILE_NAME}"
-          tar -zxf "${FILE_NAME}" ${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/boost
+          tar -zxvf "${FILE_NAME}"
         shell: bash
 
       - name: Configure CMake for Android
         if: ${{ matrix.target == 'Android'}}
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
-        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DANDROID_ABI=${{matrix.abi}} -DCMAKE_ANDROID_NDK=${ANDROID_NDK_HOME}
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}} -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DANDROID_ABI=${{matrix.abi}} -DCMAKE_ANDROID_NDK=${ANDROID_NDK_HOME}
 
       - name: Configure CMake for iOS
         if: ${{ matrix.target == 'iOS'}}
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
-        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DPLATFORM=OS64
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}} -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DPLATFORM=OS64
 
       - name: Configure CMake for Mac
         if: ${{ matrix.target == 'OSX'}}
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
-        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DPLATFORM=MAC_UNIVERSAL
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}} -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DPLATFORM=MAC_UNIVERSAL
 
       - name: Configure CMake for Linux
         if: ${{ matrix.target == 'Linux' }}
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
-        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DABI_SUBFOLDER_NAME='/${{matrix.abi}}'
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}} -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DABI_SUBFOLDER_NAME='/${{matrix.abi}}'
 
       - name: Configure CMake for Windows
         if: ${{ matrix.target == 'Windows' }}
         working-directory: ${{github.workspace}}\zkLLVM
         run: |
           cd ${{env.SOURCE_DIRECTORY}}
-          cmake  -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}\thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -G "Visual Studio 17 2022" -A x64
+          cmake  -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_DIR=${{github.workspace}}\thirdparty/${{env.SOURCE_DIRECTORY}} -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}\thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -G "Visual Studio 17 2022" -A x64
 
       - name: Build
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
@@ -159,6 +160,7 @@ jobs:
         run: cmake --install ${{env.BUILD_DIRECTORY}}
 
       - name: Create or check release
+        working-directory: ${{github.workspace}}/zkLLVM
         shell: bash
         run: |
           TAG_NAME='${{ github.event.inputs.tag }}'
