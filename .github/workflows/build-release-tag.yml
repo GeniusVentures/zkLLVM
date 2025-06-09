@@ -1,0 +1,202 @@
+name: zkLLVM Tag Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create releases for'
+        required: true
+        type: string
+
+jobs:
+  build:
+    env:
+      GH_TOKEN: ${{ secrets.GNUS_TOKEN_1 }}
+    runs-on: ${{matrix.host}}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [Android, iOS, OSX, Linux, Windows]
+        build-type: [Release]
+        abi: [""]
+        include:
+          - target: Android
+            host: ubuntu-22.04
+            abi: arm64-v8a
+            build-type: Release
+          - target: Android
+            host: ubuntu-22.04
+            abi: armeabi-v7a
+            build-type: Release
+          - target: iOS
+            host: macos-latest
+          - target: OSX
+            host: macos-latest
+          - target: Linux
+            host: ubuntu-22.04
+            abi: x86_64
+            build-type: Release
+          - target: Linux
+            host: ubuntu-24.04-arm
+            abi: aarch64
+            build-type: Release
+          - target: Windows
+            host: windows-latest
+        exclude:
+          - target: Android
+            abi: ""
+          - target: Linux
+            abi: ""
+    steps:
+      - name: Configure Linux host
+        if: ${{ runner.os == 'Linux'}}
+        run: |
+          sudo update-alternatives --install /usr/bin/cc cc $(which clang) 100
+          sudo update-alternatives --install /usr/bin/c++ c++ $(which clang++) 100
+          sudo update-alternatives --set cc $(which clang)
+          sudo update-alternatives --set c++ $(which clang++)
+
+          sudo apt install ccache ninja-build -y
+          echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
+
+      - name: Configure Windows host
+        if: ${{ runner.os == 'Windows'}}
+        run: |
+          choco install ccache -y
+
+      - name: Configure macOS host
+        if: ${{ runner.os == 'macOS'}}
+        run: |
+          brew install ccache ninja bash
+          PATH="$HOMEBREW_PREFIX/opt/gnu-tar/libexec/gnubin:$PATH"
+          echo "PATH=$PATH" >> $GITHUB_ENV
+          echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
+
+      - name: Add Android toolchain
+        if: ${{ matrix.target == 'Android' }}
+        run: |
+          NDK_VERSION="r27b"
+          wget https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux.zip -O ndk.zip
+          unzip ndk.zip -d $HOME
+
+          echo "ANDROID_NDK_HOME=$HOME/android-ndk-$NDK_VERSION" >> $GITHUB_ENV
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: zkLLVM
+          submodules: "recursive"
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: Set build directory
+        run: |
+          if [ '${{matrix.abi}}' ]; then
+            BUILD_DIRECTORY=${{matrix.build-type}}/${{matrix.abi}}
+          else
+            BUILD_DIRECTORY=${{matrix.build-type}}
+          fi
+
+          echo "SOURCE_DIRECTORY=build/${{matrix.target}}" >> $GITHUB_ENV
+          echo "BUILD_DIRECTORY=$BUILD_DIRECTORY" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Download thirdparty release
+        working-directory: ${{github.workspace}}
+        run: |
+          TAG_NAME="${{ github.event.inputs.tag }}"
+          echo "Building for tag: ${TAG_NAME}"
+
+          if [ '${{matrix.abi}}' ]; then
+            FILE_NAME=${{matrix.target}}-${{matrix.abi}}-${{matrix.build-type}}.tar.gz
+          else
+            FILE_NAME=${{matrix.target}}-${{matrix.build-type}}.tar.gz
+          fi
+          echo "FILE_NAME=${FILE_NAME}" >> $GITHUB_ENV
+
+          mkdir thirdparty
+          cd thirdparty
+
+          # Download from the tag's release
+          echo "Downloading thirdparty from tag: ${TAG_NAME}"
+
+          gh release download ${TAG_NAME} --repo GeniusVentures/thirdparty -p "${FILE_NAME}"
+          tar -zxf "${FILE_NAME}" ${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/boost
+        shell: bash
+
+      - name: Configure CMake for Android
+        if: ${{ matrix.target == 'Android'}}
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DANDROID_ABI=${{matrix.abi}} -DCMAKE_ANDROID_NDK=${ANDROID_NDK_HOME}
+
+      - name: Configure CMake for iOS
+        if: ${{ matrix.target == 'iOS'}}
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DPLATFORM=OS64
+
+      - name: Configure CMake for Mac
+        if: ${{ matrix.target == 'OSX'}}
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DPLATFORM=MAC_UNIVERSAL
+
+      - name: Configure CMake for Linux
+        if: ${{ matrix.target == 'Linux' }}
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}/thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -DABI_SUBFOLDER_NAME='/${{matrix.abi}}'
+
+      - name: Configure CMake for Windows
+        if: ${{ matrix.target == 'Windows' }}
+        working-directory: ${{github.workspace}}\zkLLVM
+        run: |
+          cd ${{env.SOURCE_DIRECTORY}}
+          cmake  -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{github.workspace}}\thirdparty/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}} -G "Visual Studio 17 2022" -A x64
+
+      - name: Build
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
+        run: cmake --build ${{env.BUILD_DIRECTORY}} --config ${{matrix.build-type}} -j
+
+      - name: Install
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
+        run: cmake --install ${{env.BUILD_DIRECTORY}}
+
+      - name: Create or check release
+        shell: bash
+        run: |
+          TAG_NAME='${{ github.event.inputs.tag }}'
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+
+          echo "Checking if GitHub release exists for tag: $TAG_NAME"
+
+          set +e
+          gh release view $TAG_NAME
+          releaseFound=$?
+          set -e
+
+          if [[ $releaseFound -ne 0 ]]; then
+              echo "Release not found, creating for tag: $TAG_NAME"
+
+              # Create a single release for the tag
+              gh release create $TAG_NAME \
+                  -n "Build artifacts for tag ${TAG_NAME}" \
+                  -t "${TAG_NAME} build artifacts"
+          else
+              echo "Release already exists for tag: $TAG_NAME"
+          fi
+
+      - name: Compress build artifacts
+        working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}
+        shell: bash
+        run: |
+          tar -czvf ${FILE_NAME} \
+              --exclude='zkLLVM/src' \
+              --exclude='zkLLVM/tmp' \
+              --transform 's|^|${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/|S' \
+              zkLLVM
+
+          mv ${FILE_NAME} "${{github.workspace}}/zkLLVM/${FILE_NAME}"
+
+      - name: Release file
+        working-directory: ${{github.workspace}}/zkLLVM
+        shell: bash
+        run: |
+          echo -e "Uploading ${FILE_NAME} to release ${TAG_NAME}"
+          gh release upload --clobber ${TAG_NAME} ${FILE_NAME}
