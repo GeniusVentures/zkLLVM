@@ -47,6 +47,10 @@ jobs:
             abi: ""
           - target: Linux
             abi: ""
+          - target: OSX
+            build-type: Debug
+          - target: iOS
+            build-type: Debug
     steps:
       - name: Configure Linux host
         if: ${{ runner.os == 'Linux'}}
