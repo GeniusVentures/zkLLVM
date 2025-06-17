@@ -213,15 +213,20 @@ jobs:
       - name: Compress build artifacts
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}
         if: github.ref_name == 'main' || github.ref_name == 'develop'
+        env:
+          DESTINATION_DIRECTORY: ${{github.workspace}}/zkLLVM/${{env.FILE_NAME}}
         shell: bash
         run: |
-          tar -czvf ${FILE_NAME} \
+          tar -czf ${FILE_NAME} \
               --exclude='zkLLVM/src' \
               --exclude='zkLLVM/tmp' \
               --transform 's|^|${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/|S' \
               zkLLVM
 
-          mv ${FILE_NAME} "${{github.workspace}}/zkLLVM/${FILE_NAME}"
+
+
+          echo "Trying to move the file to "$DESTINATION_DIRECTORY""
+          mv ${FILE_NAME} "$DESTINATION_DIRECTORY"
 
       - name: Release file
         if: github.ref_name == 'main' || github.ref_name == 'develop'
@@ -231,6 +236,9 @@ jobs:
           RELEASE_TAG='${{matrix.target}}-${{github.ref_name}}-${{matrix.build-type}}'
 
           echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_ENV
+          pwd
+          echo "Trying to release the file to "${{github.workspace}}/zkLLVM/${FILE_NAME}" "
+
 
           if ! gh release view $RELEASE_TAG; then
               echo "Release not found, creating with tag: $RELEASE_TAG"
