@@ -13,6 +13,11 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GNUS_TOKEN_1 }}
     runs-on: ${{matrix.host}}
+    container:
+      image: ${{matrix.container}}
+      credentials:
+        username: ${{github.actor}}
+        password: ${{secrets.GNUS_TOKEN_1}}
     strategy:
       fail-fast: false
       matrix:
@@ -40,6 +45,7 @@ jobs:
             host: ubuntu-24.04-arm
             abi: aarch64
             build-type: Release
+            container: ghcr.io/geniusventures/debian-bullseye:latest
           - target: Windows
             host: windows-latest
         exclude:
@@ -201,6 +207,8 @@ jobs:
       - name: Compress build artifacts
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}
         shell: bash
+        env:
+          DESTINATION_DIRECTORY: ${{github.workspace}}/zkLLVM/${{env.FILE_NAME}}
         run: |
           tar -czvf ${FILE_NAME} \
               --exclude='zkLLVM/src' \
@@ -208,7 +216,7 @@ jobs:
               --transform 's|^|${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/|S' \
               zkLLVM
 
-          mv ${FILE_NAME} "${{github.workspace}}/zkLLVM/${FILE_NAME}"
+          mv ${FILE_NAME} "$DESTINATION_DIRECTORY"
 
       - name: Release file
         working-directory: ${{github.workspace}}/zkLLVM
