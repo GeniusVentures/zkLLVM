@@ -201,7 +201,7 @@ jobs:
         if: runner.os != 'Windows'
         run: du -sh .
         shell: bash
-      
+
       - name: Print install directory size (Windows)
         if: runner.os == 'Windows'
         run: |

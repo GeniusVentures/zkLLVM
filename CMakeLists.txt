@@ -7,16 +7,12 @@
 # http://www.boost.org/LICENSE_1_0.txt
 #---------------------------------------------------------------------------#
 
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.5)
 
 cmake_policy(SET CMP0042 NEW)
 cmake_policy(SET CMP0028 NEW)
 cmake_policy(SET CMP0057 NEW)
 cmake_policy(SET CMP0063 NEW)
-
-if (ZKLLVM_BUILD_OSX_FAT_BINARY)
-    set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
-endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake"
      "${CMAKE_CURRENT_LIST_DIR}/cmake/packages"
