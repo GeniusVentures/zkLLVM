@@ -36,7 +36,7 @@ jobs:
           - target: iOS
             host: macos-latest
           - target: OSX
-            host: macos-latest
+            host: gv-OSX-Large
           - target: Linux
             host: ubuntu-22.04
             abi: x86_64
