@@ -84,7 +84,7 @@ jobs:
         run: |
           brew install ccache ninja bash gnu-tar
           # Ensure GNU tar is first in PATH
-          echo "PATH=/opt/homebrew/opt/gnu-tar/libexec/gnubin:$PATH" >> $GITHUB_ENV
+          echo "PATH=$HOMEBREW_PREFIX/opt/gnu-tar/libexec/gnubin:$PATH" >> $GITHUB_ENV
           echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
 
       - name: Add Android toolchain
@@ -235,37 +235,12 @@ jobs:
           echo "Using tar: $(which tar)"
           tar --version | head -1
           
-          # Try GNU tar with --transform, fallback if it fails
-          if tar -czf ${FILE_NAME} \
+          # Use GNU tar with --transform
+          tar -czf ${FILE_NAME} \
               --exclude='zkLLVM/src' \
               --exclude='zkLLVM/tmp' \
               --transform 's|^|${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/|S' \
-              zkLLVM 2>/dev/null; then
-            echo "GNU tar with --transform succeeded"
-          else
-            echo "GNU tar --transform failed, using alternative method"
-            # Create directory structure and copy files (with error handling)
-            mkdir -p "${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}"
-            # Copy with continue-on-error for missing files
-            cp -r zkLLVM "${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/" || {
-              echo "Some files failed to copy, continuing with available files"
-              # Try copying individual directories that exist
-              mkdir -p "${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/zkLLVM"
-              for dir in zkLLVM/*; do
-                if [ -e "$dir" ]; then
-                  cp -r "$dir" "${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/zkLLVM/" || echo "Failed to copy $dir"
-                fi
-              done
-            }
-            tar -czf ${FILE_NAME} \
-                --exclude='zkLLVM/src' \
-                --exclude='zkLLVM/tmp' \
-                "${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/zkLLVM"
-            # Clean up temporary structure
-            rm -rf "${{env.SOURCE_DIRECTORY}}"
-          fi
-
-
+              zkLLVM
 
           echo "Trying to move the file to "$DESTINATION_DIRECTORY""
           mv ${FILE_NAME} "$DESTINATION_DIRECTORY"
