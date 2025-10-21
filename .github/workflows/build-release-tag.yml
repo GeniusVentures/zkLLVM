@@ -78,8 +78,17 @@ jobs:
         if: ${{ runner.os == 'macOS'}}
         run: |
           brew install ccache ninja bash gnu-tar
-          PATH="$HOMEBREW_PREFIX/opt/gnu-tar/libexec/gnubin:$PATH"
-          echo "PATH=$PATH" >> $GITHUB_ENV
+          # Ensure GNU tar is first in PATH - check both possible Homebrew locations
+          if [ -d "/opt/homebrew/opt/gnu-tar/libexec/gnubin" ]; then
+            echo "PATH=/opt/homebrew/opt/gnu-tar/libexec/gnubin:$PATH" >> $GITHUB_ENV
+            echo "Using GNU tar from /opt/homebrew"
+          elif [ -d "/usr/local/opt/gnu-tar/libexec/gnubin" ]; then
+            echo "PATH=/usr/local/opt/gnu-tar/libexec/gnubin:$PATH" >> $GITHUB_ENV
+            echo "Using GNU tar from /usr/local"
+          else
+            echo "WARNING: GNU tar installation not found in expected locations"
+            echo "Available tar: $(which tar)"
+          fi
           echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
 
       - name: Add Android toolchain
@@ -90,6 +99,48 @@ jobs:
           unzip ndk.zip -d $HOME
 
           echo "ANDROID_NDK_HOME=$HOME/android-ndk-$NDK_VERSION" >> $GITHUB_ENV
+
+      - name: Clean workspace (self-hosted runners)
+        if: ${{ runner.environment == 'self-hosted' }}
+        working-directory: ${{github.workspace}}
+        run: |
+          echo "=== PRE-CLEANUP DEBUG ==="
+          echo "Current working directory: $(pwd)"
+          echo "Contents of workspace:"
+          ls -la
+          echo "Checking for zkLLVM directory..."
+          if [ -d "zkLLVM" ]; then
+            echo "zkLLVM directory exists, contents:"
+            ls -la zkLLVM/
+            if [ -d "zkLLVM/build" ]; then
+              echo "Build directory exists, checking for build artifacts:"
+              if [ -d "zkLLVM/build/OSX/Release" ]; then
+                echo "Found existing Release build artifacts:"
+                ls -la zkLLVM/build/OSX/Release/
+              else
+                echo "No Release build artifacts found"
+              fi
+            fi
+          else
+            echo "zkLLVM directory does not exist"
+          fi
+          
+          echo "=== CLEANUP ==="
+          # Clean up artifacts from previous runs (self-hosted runners only)
+          if [ -d "thirdparty" ]; then
+            echo "Removing thirdparty directory..."
+            rm -rf thirdparty
+          fi
+          # Clean up any existing zkLLVM directory from previous checkout
+          if [ -d "zkLLVM" ]; then
+            echo "Removing zkLLVM directory..."
+            rm -rf zkLLVM
+          fi
+          
+          echo "=== POST-CLEANUP DEBUG ==="
+          echo "Contents after cleanup:"
+          ls -la
+        shell: bash
 
       - name: Checkout
         uses: actions/checkout@v4
