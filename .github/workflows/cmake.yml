@@ -102,6 +102,20 @@ jobs:
           path: zkLLVM
           submodules: "recursive"
 
+      - name: Clean workspace (self-hosted runners)
+        if: ${{ runner.environment == 'self-hosted' }}
+        working-directory: ${{github.workspace}}
+        run: |
+          # Clean up artifacts from previous runs (self-hosted runners only)
+          if [ -d "thirdparty" ]; then
+            rm -rf thirdparty
+          fi
+          # Clean up any existing zkLLVM directory from previous checkout
+          if [ -d "zkLLVM" ]; then
+            rm -rf zkLLVM
+          fi
+        shell: bash
+
       - name: Set build directory
         run: |
           if [ '${{matrix.abi}}' ]; then
