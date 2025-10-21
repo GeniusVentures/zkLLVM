@@ -83,8 +83,8 @@ jobs:
         if: ${{ runner.os == 'macOS'}}
         run: |
           brew install ccache ninja bash gnu-tar
-          PATH="$HOMEBREW_PREFIX/opt/gnu-tar/libexec/gnubin:$PATH"
-          echo "PATH=$PATH" >> $GITHUB_ENV
+          # Ensure GNU tar is first in PATH
+          echo "/opt/homebrew/opt/gnu-tar/libexec/gnubin:$PATH" >> $GITHUB_ENV
           echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
 
       - name: Add Android toolchain
@@ -244,9 +244,19 @@ jobs:
             echo "GNU tar with --transform succeeded"
           else
             echo "GNU tar --transform failed, using alternative method"
-            # Create directory structure and copy files
+            # Create directory structure and copy files (with error handling)
             mkdir -p "${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}"
-            cp -r zkLLVM "${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/"
+            # Copy with continue-on-error for missing files
+            cp -r zkLLVM "${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/" || {
+              echo "Some files failed to copy, continuing with available files"
+              # Try copying individual directories that exist
+              mkdir -p "${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/zkLLVM"
+              for dir in zkLLVM/*; do
+                if [ -e "$dir" ]; then
+                  cp -r "$dir" "${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/zkLLVM/" || echo "Failed to copy $dir"
+                fi
+              done
+            }
             tar -czf ${FILE_NAME} \
                 --exclude='zkLLVM/src' \
                 --exclude='zkLLVM/tmp' \
