@@ -26,42 +26,42 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [Android, iOS, OSX, Linux, Windows]
-        build-type: [Debug, Release]
+        target: [OSX] # [Android, iOS, OSX, Linux, Windows]
+        build-type: [Release] # [Debug, Release]
         abi: [""]
         include:
-          - target: Android
-            host: ubuntu-22.04
-            abi: arm64-v8a
-            build-type: Release
-          - target: Android
-            host: ubuntu-22.04
-            abi: armeabi-v7a
-            build-type: Release
-          - target: iOS
-            host: macos-latest
+          # - target: Android
+          #   host: ubuntu-22.04
+          #   abi: arm64-v8a
+          #   build-type: Release
+          # - target: Android
+          #   host: ubuntu-22.04
+          #   abi: armeabi-v7a
+          #   build-type: Release
+          # - target: iOS
+          #   host: macos-latest
           - target: OSX
             host: gv-OSX-Large
-          - target: Linux
-            host: ubuntu-22.04
-            abi: x86_64
-            build-type: Release
-          - target: Linux
-            host: ubuntu-24.04-arm
-            abi: aarch64
-            build-type: Release
-            container: ghcr.io/geniusventures/debian-bullseye:latest
-          - target: Windows
-            host: windows-latest
+          # - target: Linux
+          #   host: ubuntu-22.04
+          #   abi: x86_64
+          #   build-type: Release
+          # - target: Linux
+          #   host: ubuntu-24.04-arm
+          #   abi: aarch64
+          #   build-type: Release
+          #   container: ghcr.io/geniusventures/debian-bullseye:latest
+          # - target: Windows
+          #   host: windows-latest
         exclude:
-          - target: Android
-            abi: ""
-          - target: Linux
-            abi: ""
+          # - target: Android
+          #   abi: ""
+          # - target: Linux
+          #   abi: ""
           - target: OSX
             build-type: Debug
-          - target: iOS
-            build-type: Debug
+          # - target: iOS
+          #   build-type: Debug
     steps:
       - name: Configure Linux host
         if: ${{ runner.os == 'Linux'}}
@@ -231,11 +231,29 @@ jobs:
           DESTINATION_DIRECTORY: ${{github.workspace}}/zkLLVM/${{env.FILE_NAME}}
         shell: bash
         run: |
-          tar -czf ${FILE_NAME} \
+          # Debug: Check which tar we're using
+          echo "Using tar: $(which tar)"
+          tar --version | head -1
+          
+          # Try GNU tar with --transform, fallback if it fails
+          if tar -czf ${FILE_NAME} \
               --exclude='zkLLVM/src' \
               --exclude='zkLLVM/tmp' \
               --transform 's|^|${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/|S' \
-              zkLLVM
+              zkLLVM 2>/dev/null; then
+            echo "GNU tar with --transform succeeded"
+          else
+            echo "GNU tar --transform failed, using alternative method"
+            # Create directory structure and copy files
+            mkdir -p "${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}"
+            cp -r zkLLVM "${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/"
+            tar -czf ${FILE_NAME} \
+                --exclude='zkLLVM/src' \
+                --exclude='zkLLVM/tmp' \
+                "${{env.SOURCE_DIRECTORY}}/${{env.BUILD_DIRECTORY}}/zkLLVM"
+            # Clean up temporary structure
+            rm -rf "${{env.SOURCE_DIRECTORY}}"
+          fi
 
 
 
