@@ -100,14 +100,42 @@ jobs:
         if: ${{ runner.environment == 'self-hosted' }}
         working-directory: ${{github.workspace}}
         run: |
+          echo "=== PRE-CLEANUP DEBUG ==="
+          echo "Current working directory: $(pwd)"
+          echo "Contents of workspace:"
+          ls -la
+          echo "Checking for zkLLVM directory..."
+          if [ -d "zkLLVM" ]; then
+            echo "zkLLVM directory exists, contents:"
+            ls -la zkLLVM/
+            if [ -d "zkLLVM/build" ]; then
+              echo "Build directory exists, checking for build artifacts:"
+              if [ -d "zkLLVM/build/OSX/Release" ]; then
+                echo "Found existing Release build artifacts:"
+                ls -la zkLLVM/build/OSX/Release/
+              else
+                echo "No Release build artifacts found"
+              fi
+            fi
+          else
+            echo "zkLLVM directory does not exist"
+          fi
+          
+          echo "=== CLEANUP ==="
           # Clean up artifacts from previous runs (self-hosted runners only)
           if [ -d "thirdparty" ]; then
+            echo "Removing thirdparty directory..."
             rm -rf thirdparty
           fi
           # Clean up any existing zkLLVM directory from previous checkout
           if [ -d "zkLLVM" ]; then
+            echo "Removing zkLLVM directory..."
             rm -rf zkLLVM
           fi
+          
+          echo "=== POST-CLEANUP DEBUG ==="
+          echo "Contents after cleanup:"
+          ls -la
         shell: bash
 
       - name: Checkout
@@ -115,6 +143,35 @@ jobs:
         with:
           path: zkLLVM
           submodules: "recursive"
+
+      - name: Debug fresh checkout
+        working-directory: ${{github.workspace}}
+        run: |
+          echo "=== POST-CHECKOUT DEBUG ==="
+          echo "Contents after checkout:"
+          ls -la
+          echo "zkLLVM directory contents:"
+          ls -la zkLLVM/
+          echo "Checking for any existing build artifacts..."
+          if [ -d "zkLLVM/build" ]; then
+            echo "Build directory exists (expected), contents:"
+            ls -la zkLLVM/build/
+            if [ -d "zkLLVM/build/OSX" ]; then
+              echo "OSX build directory exists, contents:"
+              ls -la zkLLVM/build/OSX/
+              if [ -d "zkLLVM/build/OSX/Release" ]; then
+                echo "WARNING: Release build artifacts already exist!"
+                ls -la zkLLVM/build/OSX/Release/
+              else
+                echo "Good: No Release build artifacts found"
+              fi
+            else
+              echo "Good: No OSX build directory found"
+            fi
+          else
+            echo "WARNING: Build directory missing from checkout"
+          fi
+        shell: bash
 
       - name: Set build directory
         run: |
@@ -188,7 +245,22 @@ jobs:
       - name: Configure CMake for Mac
         if: ${{ matrix.target == 'OSX'}}
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
-        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{env.THIRDPARTY_BUILD_DIR}} -DPLATFORM=MAC_UNIVERSAL
+        run: |
+          echo "=== PRE-CMAKE DEBUG ==="
+          echo "Current directory: $(pwd)"
+          echo "Contents of source directory:"
+          ls -la
+          echo "Build directory variable: ${{env.BUILD_DIRECTORY}}"
+          echo "Full build path would be: $(pwd)/${{env.BUILD_DIRECTORY}}"
+          if [ -d "${{env.BUILD_DIRECTORY}}" ]; then
+            echo "WARNING: Build directory ${{env.BUILD_DIRECTORY}} already exists!"
+            ls -la "${{env.BUILD_DIRECTORY}}"
+          else
+            echo "Good: Build directory ${{env.BUILD_DIRECTORY}} does not exist"
+          fi
+          
+          echo "=== RUNNING CMAKE ==="
+          cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{env.THIRDPARTY_BUILD_DIR}} -DPLATFORM=MAC_UNIVERSAL
 
       - name: Configure CMake for Linux
         if: ${{ matrix.target == 'Linux' }}
