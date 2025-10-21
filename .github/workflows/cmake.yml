@@ -96,12 +96,6 @@ jobs:
 
           echo "ANDROID_NDK_HOME=$HOME/android-ndk-$NDK_VERSION" >> $GITHUB_ENV
 
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          path: zkLLVM
-          submodules: "recursive"
-
       - name: Clean workspace (self-hosted runners)
         if: ${{ runner.environment == 'self-hosted' }}
         working-directory: ${{github.workspace}}
@@ -115,6 +109,12 @@ jobs:
             rm -rf zkLLVM
           fi
         shell: bash
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: zkLLVM
+          submodules: "recursive"
 
       - name: Set build directory
         run: |
