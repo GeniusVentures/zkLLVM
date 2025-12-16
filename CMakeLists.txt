@@ -15,14 +15,15 @@ cmake_policy(SET CMP0057 NEW)
 cmake_policy(SET CMP0063 NEW)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake"
-     "${CMAKE_CURRENT_LIST_DIR}/cmake/packages"
-     "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/share/modules/cmake")
+    "${CMAKE_CURRENT_LIST_DIR}/cmake/packages"
+    "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/share/modules/cmake")
+
+project(zkllvm LANGUAGES C CXX VERSION 0.3.0)
 
 include(CMConfig)
 include(CMSetupVersion)
 
 cm_workspace(zkllvm)
-
 
 macro(cm_find_package NAME)
     if(NOT "${NAME}" MATCHES "^${CMAKE_WORKSPACE_NAME}_.*$" AND NOT "${NAME}" STREQUAL CM)
@@ -87,21 +88,21 @@ add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libs/crypto3")
 
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libs/blueprint")
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libs/assigner")
-if (ZKLLVM_BUILD_TRANSPILER_LIB)
+if(ZKLLVM_BUILD_TRANSPILER_LIB)
     add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libs/transpiler")
 endif()
 
 set(LLVM_ENABLE_PROJECTS "clang" CACHE STRING "Additional llvm projects")
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/libs/circifier/llvm")
 
-if (ZKLLVM_BUILD_EXAMPLES)
+if(ZKLLVM_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 if(BUILD_TESTS)
-  add_subdirectory(tests)
+    add_subdirectory(tests)
 endif()
 
-if (ZKLLVM_BUILD_STD_LIB)
+if(ZKLLVM_BUILD_STD_LIB)
     add_subdirectory(libs/stdlib)
 endif()
 
@@ -111,9 +112,9 @@ find_package(Git REQUIRED)
 
 if(NOT ZKLLVM_VERSION)
     execute_process(COMMAND ${GIT_EXECUTABLE} describe --tags HEAD
-                    OUTPUT_VARIABLE DESCRIBE_OUTBUT
-                    OUTPUT_STRIP_TRAILING_WHITESPACE
-                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        OUTPUT_VARIABLE DESCRIBE_OUTBUT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
     if(NOT ("${DESCRIBE_OUTBUT}" STREQUAL "${ZKLLVM_VERSION}"))
         set(ZKLLVM_VERSION "${DESCRIBE_OUTBUT}")
@@ -121,7 +122,7 @@ if(NOT ZKLLVM_VERSION)
 
     if(NOT ZKLLVM_VERSION)
         message(FATAL_ERROR
-                "Unable to retrive version from git or ${VERSION_FILE} file.")
+            "Unable to retrive version from git or ${VERSION_FILE} file.")
     endif()
 endif()
 
@@ -152,9 +153,9 @@ endif()
 set(CPACK_PACKAGING_INSTALL_PREFIX "/usr/lib/zkllvm")
 
 configure_file("${CMAKE_CURRENT_LIST_DIR}/cmake/zkllvm.conf.in"
-               "${CMAKE_CURRENT_BINARY_DIR}/zkllvm.conf"
-               NO_SOURCE_PERMISSIONS
-               @ONLY)
+    "${CMAKE_CURRENT_BINARY_DIR}/zkllvm.conf"
+    NO_SOURCE_PERMISSIONS
+    @ONLY)
 set(CMAKE_INSTALL_PREFIX "/etc/ld.so.conf.d" CACHE STRING "Default install path")
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/zkllvm.conf" DESTINATION ${CMAKE_INSTALL_PREFIX})
@@ -168,76 +169,76 @@ install(SCRIPT cmake/create-symlinks.cmake)
 
 include(CPack)
 
-if (ZKLLVM_BUILD_EXECUTABLES)
+if(ZKLLVM_BUILD_EXECUTABLES)
     add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/bin")
 endif()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
-if (ZKLLVM_BUILD_RSLANG)
-message(STATUS "Configuring rslang")
+if(ZKLLVM_BUILD_RSLANG)
+    message(STATUS "Configuring rslang")
 
-execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/detect-platform.py
-                RESULT_VARIABLE DETECT_PLATFORM_RESULT
-                OUTPUT_VARIABLE RUSTC_HOST_TRIPLE
-                OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/detect-platform.py
+        RESULT_VARIABLE DETECT_PLATFORM_RESULT
+        OUTPUT_VARIABLE RUSTC_HOST_TRIPLE
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-if(NOT ${DETECT_PLATFORM_RESULT} EQUAL 0)
-    message(FATAL_ERROR "Failed to detect host platform")
-endif()
-
-list(APPEND RSLANG_BUILD_ARGS --set llvm.download-ci-llvm=false)
-list(APPEND RSLANG_BUILD_ARGS --release-channel=nightly)
-list(APPEND RSLANG_BUILD_ARGS "--release-description=zkLLVM ${ZKLLVM_VERSION_MAJOR}.${ZKLLVM_VERSION_MINOR}.${ZKLLVM_VERSION_PATCH}")
-list(APPEND RSLANG_BUILD_ARGS --target=${RUSTC_HOST_TRIPLE},assigner-unknown-unknown)
-list(APPEND RSLANG_BUILD_ARGS --set target.${RUSTC_HOST_TRIPLE}.llvm-config=${CMAKE_CURRENT_BINARY_DIR}/libs/circifier/llvm/bin/llvm-config)
-list(APPEND RSLANG_BUILD_ARGS --set target.assigner-unknown-unknown.llvm-config=${CMAKE_CURRENT_BINARY_DIR}/libs/circifier/llvm/bin/llvm-config)
-list(APPEND RSLANG_BUILD_ARGS --set target.assigner-unknown-unknown.linker=llvm-link)
-if(${BUILD_SHARED_LIBS})
-    list(APPEND RSLANG_BUILD_ARGS --enable-llvm-link-shared)
-endif()
-list(APPEND RSLANG_BUILD_ARGS --set build.build-dir=${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/build)
-list(APPEND RSLANG_BUILD_ARGS --set build.build-stage=${RSLANG_BUILD_STAGE})
-list(APPEND RSLANG_BUILD_ARGS --set build.cargo=${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/target/release/cargo)
-if(${RSLANG_BUILD_EXTENDED})
-    list(APPEND RSLANG_BUILD_ARGS --enable-extended)
-    if(NOT RSLANG_BUILD_TOOLS STREQUAL "<none>")
-        list(APPEND RSLANG_BUILD_ARGS --tools=${RSLANG_BUILD_TOOLS})
+    if(NOT ${DETECT_PLATFORM_RESULT} EQUAL 0)
+        message(FATAL_ERROR "Failed to detect host platform")
     endif()
-else()
-    list(APPEND RSLANG_BUILD_ARGS --disable-extended)
-endif()
-if(CMAKE_BUILD_TYPE MATCHES Debug)
-    list(APPEND RSLANG_BUILD_ARGS --enable-debug)
-endif()
-list(APPEND RSLANG_BUILD_ARGS --dist-compression-formats=gz)
-# TODO: (aleasims) re-enable docs after fixing all errors:
-# Issue: https://github.com/NilFoundation/zkllvm-rslang/issues/74
-list(APPEND RSLANG_BUILD_ARGS --disable-docs)
 
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang)
-file(REMOVE ${RSLANG_CONFIG})
-execute_process(COMMAND ${CMAKE_CURRENT_LIST_DIR}/libs/rslang/configure ${RSLANG_BUILD_ARGS}
-                COMMAND_ERROR_IS_FATAL ANY
-                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang)
+    list(APPEND RSLANG_BUILD_ARGS --set llvm.download-ci-llvm=false)
+    list(APPEND RSLANG_BUILD_ARGS --release-channel=nightly)
+    list(APPEND RSLANG_BUILD_ARGS "--release-description=zkLLVM ${ZKLLVM_VERSION_MAJOR}.${ZKLLVM_VERSION_MINOR}.${ZKLLVM_VERSION_PATCH}")
+    list(APPEND RSLANG_BUILD_ARGS --target=${RUSTC_HOST_TRIPLE},assigner-unknown-unknown)
+    list(APPEND RSLANG_BUILD_ARGS --set target.${RUSTC_HOST_TRIPLE}.llvm-config=${CMAKE_CURRENT_BINARY_DIR}/libs/circifier/llvm/bin/llvm-config)
+    list(APPEND RSLANG_BUILD_ARGS --set target.assigner-unknown-unknown.llvm-config=${CMAKE_CURRENT_BINARY_DIR}/libs/circifier/llvm/bin/llvm-config)
+    list(APPEND RSLANG_BUILD_ARGS --set target.assigner-unknown-unknown.linker=llvm-link)
+    if(${BUILD_SHARED_LIBS})
+        list(APPEND RSLANG_BUILD_ARGS --enable-llvm-link-shared)
+    endif()
+    list(APPEND RSLANG_BUILD_ARGS --set build.build-dir=${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/build)
+    list(APPEND RSLANG_BUILD_ARGS --set build.build-stage=${RSLANG_BUILD_STAGE})
+    list(APPEND RSLANG_BUILD_ARGS --set build.cargo=${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/target/release/cargo)
+    if(${RSLANG_BUILD_EXTENDED})
+        list(APPEND RSLANG_BUILD_ARGS --enable-extended)
+        if(NOT RSLANG_BUILD_TOOLS STREQUAL "<none>")
+            list(APPEND RSLANG_BUILD_ARGS --tools=${RSLANG_BUILD_TOOLS})
+        endif()
+    else()
+        list(APPEND RSLANG_BUILD_ARGS --disable-extended)
+    endif()
+    if(CMAKE_BUILD_TYPE MATCHES Debug)
+        list(APPEND RSLANG_BUILD_ARGS --enable-debug)
+    endif()
+    list(APPEND RSLANG_BUILD_ARGS --dist-compression-formats=gz)
+    # TODO: (aleasims) re-enable docs after fixing all errors:
+    # Issue: https://github.com/NilFoundation/zkllvm-rslang/issues/74
+    list(APPEND RSLANG_BUILD_ARGS --disable-docs)
 
-add_custom_target(cargo
-                  COMMAND cargo build --release --target-dir ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/target
-                  COMMENT "Building cargo"
-                  USES_TERMINAL
-                  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/libs/rslang/src/tools/cargo)
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang)
+    file(REMOVE ${RSLANG_CONFIG})
+    execute_process(COMMAND ${CMAKE_CURRENT_LIST_DIR}/libs/rslang/configure ${RSLANG_BUILD_ARGS}
+        COMMAND_ERROR_IS_FATAL ANY
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang)
 
-add_custom_target(rslang
-                  COMMAND ./x build --config ${RSLANG_CONFIG}
-                  DEPENDS llvm-libraries llvm-config llvm-link FileCheck cargo
-                  COMMENT "Building rslang"
-                  USES_TERMINAL
-                  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/libs/rslang)
+    add_custom_target(cargo
+        COMMAND cargo build --release --target-dir ${CMAKE_CURRENT_BINARY_DIR}/libs/rslang/target
+        COMMENT "Building cargo"
+        USES_TERMINAL
+        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/libs/rslang/src/tools/cargo)
 
-add_custom_target(rslang_dist
-                  COMMAND ./x dist --config ${RSLANG_CONFIG}
-                  DEPENDS rslang
-                  COMMENT "Building rslang distribution package"
-                  USES_TERMINAL
-                  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/libs/rslang)
+    add_custom_target(rslang
+        COMMAND ./x build --config ${RSLANG_CONFIG}
+        DEPENDS llvm-libraries llvm-config llvm-link FileCheck cargo
+        COMMENT "Building rslang"
+        USES_TERMINAL
+        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/libs/rslang)
+
+    add_custom_target(rslang_dist
+        COMMAND ./x dist --config ${RSLANG_CONFIG}
+        DEPENDS rslang
+        COMMENT "Building rslang distribution package"
+        USES_TERMINAL
+        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/libs/rslang)
 endif()
