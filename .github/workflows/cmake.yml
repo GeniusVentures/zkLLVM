@@ -227,7 +227,11 @@ jobs:
           mkdir thirdparty
           cd thirdparty
 
-          tag_name="${{matrix.target}}-${thirdparty_branch}-${{matrix.build-type}}"
+          if [ '${{matrix.abi}}' ]; then
+            tag_name="${{{matrix.target}}}-${{matrix.abi}}-${thirdparty_branch}-${{{matrix.build-type}}}"
+          else
+            tag_name="${{{matrix.target}}}-${thirdparty_branch}-${{{matrix.build-type}}}"
+          fi
 
           gh release download ${tag_name} --repo GeniusVentures/thirdparty -p "${FILE_NAME}"
           tar -zxf "${FILE_NAME}"
@@ -333,7 +337,11 @@ jobs:
         working-directory: ${{github.workspace}}/zkLLVM
         shell: bash
         run: |
-          RELEASE_TAG='${{matrix.target}}-${{github.ref_name}}-${{matrix.build-type}}'
+          if [ '${{matrix.abi}}' ]; then
+            RELEASE_TAG='${{matrix.target}}-${{matrix.abi}}-${{github.ref_name}}-${{matrix.build-type}}'
+          else
+            RELEASE_TAG='${{matrix.target}}-${{github.ref_name}}-${{matrix.build-type}}'
+          fi
 
           echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_ENV
           pwd
