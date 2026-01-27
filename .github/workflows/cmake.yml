@@ -12,9 +12,43 @@ on:
       - develop
       - main
   workflow_dispatch:
+    inputs:
+      build_android:
+        description: 'Build Android'
+        required: true
+        default: 'true'
+        type: boolean
+      build_ios:
+        description: 'Build iOS'
+        required: true
+        default: 'true'
+        type: boolean
+      build_osx:
+        description: 'Build OSX'
+        required: true
+        default: 'true'
+        type: boolean
+      build_linux:
+        description: 'Build Linux'
+        required: true
+        default: 'true'
+        type: boolean
+      build_windows:
+        description: 'Build Windows'
+        required: true
+        default: 'true'
+        type: boolean
 
 jobs:
   build:
+    if: |
+      github.event_name != 'workflow_dispatch' || (
+        (matrix.target == 'Android' && inputs.build_android == 'true') ||
+        (matrix.target == 'iOS' && inputs.build_ios == 'true') ||
+        (matrix.target == 'OSX' && inputs.build_osx == 'true') ||
+        (matrix.target == 'Linux' && inputs.build_linux == 'true') ||
+        (matrix.target == 'Windows' && inputs.build_windows == 'true')
+      )
     env:
       GH_TOKEN: ${{ secrets.GNUS_TOKEN_1 }}
     runs-on: ${{matrix.host}}
