@@ -228,9 +228,9 @@ jobs:
           cd thirdparty
 
           if [ '${{matrix.abi}}' ]; then
-            tag_name="${{{matrix.target}}}-${{matrix.abi}}-${thirdparty_branch}-${{{matrix.build-type}}}"
+            tag_name="${{matrix.target}}-${{matrix.abi}}-${thirdparty_branch}-${{matrix.build-type}}"
           else
-            tag_name="${{{matrix.target}}}-${thirdparty_branch}-${{{matrix.build-type}}}"
+            tag_name="${{matrix.target}}-${thirdparty_branch}-${{matrix.build-type}}"
           fi
 
           gh release download ${tag_name} --repo GeniusVentures/thirdparty -p "${FILE_NAME}"
