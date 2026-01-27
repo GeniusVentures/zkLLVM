@@ -354,7 +354,7 @@ jobs:
               if [ '${{ matrix.build-type }}' != 'Release' ]; then
                   RELEASE_TYPE="--prerelease"
               else
-                  RELEASE_TYPE="--latest"
+                  RELEASE_TYPE=""
               fi
 
               gh release create $RELEASE_TAG \
