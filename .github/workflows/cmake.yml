@@ -13,8 +13,13 @@ on:
       - main
   workflow_dispatch:
     inputs:
-      build_android:
-        description: 'Build Android'
+      build_android_arm64v8a:
+        description: 'Build Android arm64-v8a'
+        required: true
+        default: 'true'
+        type: boolean
+      build_android_armv7a:
+        description: 'Build Android armeabi-v7a'
         required: true
         default: 'true'
         type: boolean
@@ -28,13 +33,23 @@ on:
         required: true
         default: 'true'
         type: boolean
-      build_linux:
-        description: 'Build Linux'
+      build_linux_x86_64:
+        description: 'Build Linux x86_64'
         required: true
         default: 'true'
         type: boolean
-      build_windows:
-        description: 'Build Windows'
+      build_linux_aarch64:
+        description: 'Build Linux aarch64'
+        required: true
+        default: 'true'
+        type: boolean
+      build_windows_release:
+        description: 'Build Windows Release'
+        required: true
+        default: 'true'
+        type: boolean
+      build_windows_debug:
+        description: 'Build Windows Debug'
         required: true
         default: 'true'
         type: boolean
@@ -93,26 +108,35 @@ jobs:
         run: |
           SHOULD_RUN="true"
           if [ '${{ github.event_name }}' == 'workflow_dispatch' ]; then
-            case '${{ matrix.target }}' in
-              Android)
-                if [ '${{ inputs.build_android }}' != 'true' ]; then SHOULD_RUN="false"; fi
+            case '${{ matrix.target }}-${{ matrix.abi }}-${{ matrix.build-type }}' in
+              Android-arm64-v8a-Release)
+                if [ '${{ inputs.build_android_arm64v8a }}' != 'true' ]; then SHOULD_RUN="false"; fi
                 ;;
-              iOS)
+              Android-armeabi-v7a-Release)
+                if [ '${{ inputs.build_android_armv7a }}' != 'true' ]; then SHOULD_RUN="false"; fi
+                ;;
+              iOS-*)
                 if [ '${{ inputs.build_ios }}' != 'true' ]; then SHOULD_RUN="false"; fi
                 ;;
-              OSX)
+              OSX-*)
                 if [ '${{ inputs.build_osx }}' != 'true' ]; then SHOULD_RUN="false"; fi
                 ;;
-              Linux)
-                if [ '${{ inputs.build_linux }}' != 'true' ]; then SHOULD_RUN="false"; fi
+              Linux-x86_64-Release)
+                if [ '${{ inputs.build_linux_x86_64 }}' != 'true' ]; then SHOULD_RUN="false"; fi
                 ;;
-              Windows)
-                if [ '${{ inputs.build_windows }}' != 'true' ]; then SHOULD_RUN="false"; fi
+              Linux-aarch64-Release)
+                if [ '${{ inputs.build_linux_aarch64 }}' != 'true' ]; then SHOULD_RUN="false"; fi
+                ;;
+              Windows-*-Release)
+                if [ '${{ inputs.build_windows_release }}' != 'true' ]; then SHOULD_RUN="false"; fi
+                ;;
+              Windows-*-Debug)
+                if [ '${{ inputs.build_windows_debug }}' != 'true' ]; then SHOULD_RUN="false"; fi
                 ;;
             esac
           fi
           if [ "$SHOULD_RUN" == "false" ]; then
-            echo "Skipping build for ${{ matrix.target }}"
+            echo "Skipping build for ${{ matrix.target }} ${{ matrix.abi }} ${{ matrix.build-type }}"
             exit 78
           fi
         shell: bash
