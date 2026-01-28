@@ -41,14 +41,6 @@ on:
 
 jobs:
   build:
-    if: |
-      github.event_name != 'workflow_dispatch' || (
-        (matrix.target == 'Android' && inputs.build_android == 'true') ||
-        (matrix.target == 'iOS' && inputs.build_ios == 'true') ||
-        (matrix.target == 'OSX' && inputs.build_osx == 'true') ||
-        (matrix.target == 'Linux' && inputs.build_linux == 'true') ||
-        (matrix.target == 'Windows' && inputs.build_windows == 'true')
-      )
     env:
       GH_TOKEN: ${{ secrets.GNUS_TOKEN_1 }}
     runs-on: ${{matrix.host}}
@@ -97,6 +89,34 @@ jobs:
           - target: iOS
             build-type: Debug
     steps:
+      - name: Check if build should run
+        run: |
+          SHOULD_RUN="true"
+          if [ '${{ github.event_name }}' == 'workflow_dispatch' ]; then
+            case '${{ matrix.target }}' in
+              Android)
+                if [ '${{ inputs.build_android }}' != 'true' ]; then SHOULD_RUN="false"; fi
+                ;;
+              iOS)
+                if [ '${{ inputs.build_ios }}' != 'true' ]; then SHOULD_RUN="false"; fi
+                ;;
+              OSX)
+                if [ '${{ inputs.build_osx }}' != 'true' ]; then SHOULD_RUN="false"; fi
+                ;;
+              Linux)
+                if [ '${{ inputs.build_linux }}' != 'true' ]; then SHOULD_RUN="false"; fi
+                ;;
+              Windows)
+                if [ '${{ inputs.build_windows }}' != 'true' ]; then SHOULD_RUN="false"; fi
+                ;;
+            esac
+          fi
+          if [ "$SHOULD_RUN" == "false" ]; then
+            echo "Skipping build for ${{ matrix.target }}"
+            exit 78
+          fi
+        shell: bash
+
       - name: Configure Linux host
         if: ${{ runner.os == 'Linux'}}
         run: |
