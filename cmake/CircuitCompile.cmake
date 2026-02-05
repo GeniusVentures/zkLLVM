@@ -70,6 +70,12 @@ function(add_circuit_no_stdlib name)
         set(LINKER llvm-link-zkllvm)
     endif()
 
+    # Set conservative CPU flags for x86_64 to avoid unsupported instructions in virtualized environments
+    set(ARCH_FLAGS "")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64" OR ARCH STREQUAL "x86_64")
+        set(ARCH_FLAGS "-march=x86-64 -mno-avx2 -mno-bmi2 -mno-bmi -mno-lzcnt -mno-fma")
+    endif()
+
     # Compile sources
     set(compiler_outputs "")
     add_custom_target(${name}_compile_sources)
@@ -77,7 +83,7 @@ function(add_circuit_no_stdlib name)
         get_filename_component(source_base_name ${source} NAME)
         add_custom_target(${name}_${source_base_name}_ll
                         COMMAND ${CLANG} -target assigner -Xclang -fpreserve-vec3-type -Werror=unknown-attributes -D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION
-                        -D__ZKLLVM__ ${INCLUDE_DIRS_LIST} -emit-llvm -O1 -S ${ARG_COMPILER_OPTIONS}  -o ${name}_${source_base_name}.ll ${source}
+                        -D__ZKLLVM__ ${INCLUDE_DIRS_LIST} -emit-llvm -O1 ${ARCH_FLAGS} -S ${ARG_COMPILER_OPTIONS}  -o ${name}_${source_base_name}.ll ${source}
 
                         VERBATIM COMMAND_EXPAND_LISTS
 
