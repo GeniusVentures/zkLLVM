@@ -77,6 +77,13 @@ endif()
 if(LINUX)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GNU_SOURCE -fvisibility=hidden")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_GNU_SOURCE -fvisibility=hidden")
+    
+    # For x86_64 Linux, use conservative CPU features to ensure LLVM/Clang binaries
+    # can run in virtualized environments (Docker, VMs) that may not expose AVX2/BMI2
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64|amd64|AMD64)" OR ARCH STREQUAL "x86_64")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=x86-64")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=x86-64")
+    endif()
 endif()
 
 set(_CMAKE_COMMON_CACHE_ARGS
