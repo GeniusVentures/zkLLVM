@@ -139,3 +139,27 @@ function(define_target_platform_features prefix_name)
 
     add_definitions(-D${UPPER_PREFIX_NAME}_TARGET_OS_HAS_THREADS)
 endfunction()
+
+set(ZKLLVM_HOST_LIST "Darwin;Windows;Linux" CACHE STRING "List of host platforms for zkLLVM")
+if (${CMAKE_SYSTEM_NAME} IN_LIST ZKLLVM_HOST_LIST)
+    option(ZK_BUILD_CLANG_TOOLS "Whether to build clang tools" ON)
+    option(ZK_BUILD_LLVM_TOOLS "Whether to build llvm tools" ON)
+else()
+    option(ZK_BUILD_CLANG_TOOLS "Whether to build clang tools" OFF)
+    option(ZK_BUILD_LLVM_TOOLS "Whether to build llvm tools" OFF)
+endif()
+
+if (ZK_BUILD_CLANG_TOOLS)
+    set(_ZKLLVM_EXTRA_PARAM ${_ZKLLVM_EXTRA_PARAM} -DCLANG_BUILD_TOOLS:BOOL=ON)
+else()
+    set(_ZKLLVM_EXTRA_PARAM ${_ZKLLVM_EXTRA_PARAM} -DCLANG_BUILD_TOOLS:BOOL=OFF)
+endif()
+
+if (ZK_BUILD_LLVM_TOOLS)
+    set(_ZKLLVM_EXTRA_PARAM ${_ZKLLVM_EXTRA_PARAM} -DLLVM_BUILD_TOOLS:BOOL=ON)
+else()
+    set(_ZKLLVM_EXTRA_PARAM ${_ZKLLVM_EXTRA_PARAM} -DLLVM_BUILD_TOOLS:BOOL=OFF)
+endif()
+
+message(STATUS "ZK_BUILD_CLANG_TOOLS: ${ZK_BUILD_CLANG_TOOLS}")
+message(STATUS "ZK_BUILD_LLVM_TOOLS: ${ZK_BUILD_LLVM_TOOLS}")
