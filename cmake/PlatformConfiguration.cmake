@@ -141,7 +141,7 @@ function(define_target_platform_features prefix_name)
 endfunction()
 
 set(ZKLLVM_HOST_LIST "Darwin;Windows;Linux" CACHE STRING "List of host platforms for zkLLVM")
-if (${CMAKE_SYSTEM_NAME} IN_LIST ZKLLVM_HOST_LIST)
+if (NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug" AND ${CMAKE_SYSTEM_NAME} IN_LIST ZKLLVM_HOST_LIST)
     option(ZK_BUILD_CLANG_TOOLS "Whether to build clang tools" ON)
     option(ZK_BUILD_LLVM_TOOLS "Whether to build llvm tools" ON)
 else()
