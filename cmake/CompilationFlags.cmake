@@ -13,11 +13,8 @@ if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "^(AppleClang|Clang|GNU)$")
   add_flag(-Woverloaded-virtual)     # warn if you overload (not override) a virtual function
   add_flag(-Wformat=2)               # warn on security issues around functions that format output (ie printf)
   add_flag(-Wmisleading-indentation) # (only in GCC >= 6.0) warn if indentation implies blocks where blocks do not exist
-  add_flag(-Wduplicated-cond)        # (only in GCC >= 6.0) warn if if / else chain has duplicated conditions
-  add_flag(-Wduplicated-branches)    # (only in GCC >= 7.0) warn if if / else branches have duplicated code
   add_flag(-Wnull-dereference)       # (only in GCC >= 6.0) warn if a null dereference is detected
   add_flag(-Wdouble-promotion)       # (GCC >= 4.6, Clang >= 3.8) warn if float is implicit promoted to double
-  add_flag(-Wsign-compare)
   add_flag(-Wtype-limits)            # size_t - size_t >= 0 -> always true
   add_flag(-Wnon-virtual-dtor) # warn the user if a class with virtual functions has a non-virtual destructor. This helps catch hard to track down memory errors
 

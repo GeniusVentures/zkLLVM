@@ -54,10 +54,6 @@ function(define_target_platform_size prefix_name target_architecture)
     string(TOUPPER ${prefix_name} UPPER_PREFIX_NAME)
 
     if(${CMAKE_TARGET_ARCHITECTURE} STREQUAL ${CMAKE_HOST_SYSTEM_PROCESSOR})
-        #        check_type_size(int CMAKE_TARGET_INTEGER_SIZE_BYTE)
-        #        math(EXPR CMAKE_TARGET_INTEGER_SIZE_BITS "${CMAKE_TARGET_INTEGER_SIZE_BYTE} * 8")
-        #        add_definitions(-D${UPPER_PREFIX_NAME}_MP_WORD_BITS=${CMAKE_TARGET_INTEGER_SIZE_BITS})
-
         if(${UPPER_TARGET_ARCHITECTURE} STREQUAL "ALPHA" OR
            ${UPPER_TARGET_ARCHITECTURE} STREQUAL "ARM64" OR
            ${UPPER_TARGET_ARCHITECTURE} STREQUAL "X86_64" OR

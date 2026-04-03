@@ -16,42 +16,42 @@ on:
       build_android_arm64v8a:
         description: 'Build Android arm64-v8a'
         required: true
-        default: 'true'
+        default: true
         type: boolean
       build_android_armv7a:
         description: 'Build Android armeabi-v7a'
         required: true
-        default: 'true'
+        default: true
         type: boolean
       build_ios:
         description: 'Build iOS'
         required: true
-        default: 'true'
+        default: true
         type: boolean
       build_osx:
         description: 'Build OSX'
         required: true
-        default: 'true'
+        default: true
         type: boolean
       build_linux_x86_64:
         description: 'Build Linux x86_64'
         required: true
-        default: 'true'
+        default: true
         type: boolean
       build_linux_aarch64:
         description: 'Build Linux aarch64'
         required: true
-        default: 'true'
+        default: true
         type: boolean
       build_windows_release:
         description: 'Build Windows Release'
         required: true
-        default: 'true'
+        default: true
         type: boolean
       build_windows_debug:
         description: 'Build Windows Debug'
         required: true
-        default: 'true'
+        default: true
         type: boolean
 
 jobs:
