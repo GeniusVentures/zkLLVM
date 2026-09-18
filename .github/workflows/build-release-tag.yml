@@ -7,6 +7,10 @@ on:
         description: "Tag to create releases for"
         required: true
         type: string
+      thirdparty_tag:
+        description: "Tag for thirdparty dependencies (defaults to main tag if not specified)"
+        required: false
+        type: string
       # Names must be build_<target>-<abi>_<build-type>: the skip step looks
       # them up dynamically instead of enumerating every combination. This
       # workflow only builds Release for everything except Windows, so there
@@ -209,6 +213,7 @@ jobs:
         run: |
           TAG_NAME="${{ github.event.inputs.tag }}"
           echo "Building for tag: ${TAG_NAME}"
+          echo "Using thirdparty tag: ${THIRDPARTY_TAG}"
 
           if [ '${{matrix.abi}}' ]; then
             FILE_NAME=${{matrix.target}}-${{matrix.abi}}-${{matrix.build-type}}.tar.gz
@@ -221,10 +226,10 @@ jobs:
           cd thirdparty
           pwd
 
-          # Download from the tag's release
-          echo "Downloading thirdparty from tag: ${TAG_NAME}"
+          # Download from the specified thirdparty tag's release
+          echo "Downloading thirdparty from tag: ${THIRDPARTY_TAG}"
 
-          gh release download ${TAG_NAME} --repo GeniusVentures/thirdparty -p "${FILE_NAME}"
+          gh release download ${THIRDPARTY_TAG} --repo GeniusVentures/thirdparty -p "${FILE_NAME}"
           tar -zxvf "${FILE_NAME}"
 
           # Set THIRDPARTY_BUILD_DIR to the actual location where files were extracted
@@ -237,6 +242,8 @@ jobs:
           fi
 
         shell: bash
+        env:
+          THIRDPARTY_TAG: ${{github.event.inputs.thirdparty_tag || github.event.inputs.tag}}
 
       - name: Configure CMake for Android
         if: ${{ matrix.target == 'Android'}}
