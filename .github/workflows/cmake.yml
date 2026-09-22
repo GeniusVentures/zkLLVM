@@ -87,12 +87,12 @@ jobs:
             host: ubuntu-22.04
             abi: x86_64
             build-type: Release
-            container: ghcr.io/geniusventures/debian-bullseye:latest
+            container: ghcr.io/geniusventures/almalinux-8:latest
           - target: Linux
             host: ubuntu-24.04-arm
             abi: aarch64
             build-type: Release
-            container: ghcr.io/geniusventures/debian-bullseye:latest
+            container: ghcr.io/geniusventures/almalinux-8:latest
           - target: Windows
             host: windows-latest
         exclude:
@@ -150,7 +150,19 @@ jobs:
           sudo update-alternatives --set cc $(which clang)
           sudo update-alternatives --set c++ $(which clang++)
 
-          sudo apt install ccache ninja-build -y
+          # Native Linux builds run in the AlmaLinux 8 CI image (glibc 2.28
+          # floor, replacing the EOL Debian Bullseye container). The image
+          # ships clang, cmake, and ninja, so the dnf branch is a guarded
+          # safety net that avoids repo traffic when the image already
+          # provides everything; Ubuntu runners (used by the Android builds,
+          # which run without a container) still need apt.
+          if command -v dnf >/dev/null 2>&1; then
+            if ! rpm -q ccache ninja-build >/dev/null 2>&1; then
+              sudo dnf install -y ccache ninja-build
+            fi
+          else
+            sudo apt install ccache ninja-build -y
+          fi
           echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
 
       - name: Configure Windows host
@@ -346,7 +358,15 @@ jobs:
       - name: Configure CMake for Linux
         if: ${{ matrix.target == 'Linux' }}
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
-        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{env.THIRDPARTY_BUILD_DIR}} -DABI_SUBFOLDER_NAME='/${{matrix.abi}}'
+        # Pin clang explicitly rather than relying on the /usr/bin/cc and
+        # /usr/bin/c++ update-alternatives symlinks: on AlmaLinux 8
+        # /usr/bin/c++ is a real file owned by gcc-c++ (not an alternatives
+        # symlink like Debian's), so the update-alternatives takeover fails
+        # silently and CMake falls back to g++ 8.5, which cannot compile the
+        # crypto3 constexpr code this tree vendors (same failure observed in
+        # SuperGenius run 35377550250: divide.hpp:347 "is not a constant
+        # expression").
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DCMAKE_C_COMPILER=$(which clang) -DCMAKE_CXX_COMPILER=$(which clang++) -DTHIRDPARTY_BUILD_DIR=${{env.THIRDPARTY_BUILD_DIR}} -DABI_SUBFOLDER_NAME='/${{matrix.abi}}'
 
       - name: Configure CMake for Windows
         if: ${{ matrix.target == 'Windows' }}
