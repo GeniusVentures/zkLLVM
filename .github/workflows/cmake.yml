@@ -170,6 +170,16 @@ jobs:
         run: |
           choco install ccache -y
 
+          # Cap compiler concurrency on the self-hosted SG-WIN11 box (32 GB):
+          # zkLLVM/crypto3 headers are the heaviest in the fleet and 24
+          # cl.exe instances page the box to disk (observed 2026-09; same
+          # cap as SuperGenius, where 8 was measured best). The bare `-j`
+          # in the build step honours this env cap. Hosted Windows runners
+          # keep unbounded parallelism.
+          if ("${{ runner.environment }}" -eq "self-hosted") {
+            Add-Content -Path $env:GITHUB_ENV -Value "CMAKE_BUILD_PARALLEL_LEVEL=8"
+          }
+
       - name: Configure macOS host
         if: ${{ runner.os == 'macOS'}}
         run: |
