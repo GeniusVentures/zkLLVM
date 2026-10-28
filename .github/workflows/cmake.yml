@@ -81,6 +81,10 @@ jobs:
             build-type: Release
           - target: iOS
             host: macos-latest
+          - target: iOS
+            host: macos-latest
+            abi: arm64-simulator
+            build-type: Release
           - target: OSX
             host: gv-OSX-Large
           - target: Linux
@@ -343,7 +347,7 @@ jobs:
       - name: Configure CMake for iOS
         if: ${{ matrix.target == 'iOS'}}
         working-directory: ${{github.workspace}}/zkLLVM/${{env.SOURCE_DIRECTORY}}
-        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{env.THIRDPARTY_BUILD_DIR}} -DPLATFORM=OS64
+        run: cmake -B ${{env.BUILD_DIRECTORY}} -DCMAKE_BUILD_TYPE=${{matrix.build-type}} -DCMAKE_C_STANDARD=17 -DTHIRDPARTY_BUILD_DIR=${{env.THIRDPARTY_BUILD_DIR}} -DPLATFORM=${{ matrix.abi == 'arm64-simulator' && 'SIMULATORARM64' || 'OS64' }}
 
       - name: Configure CMake for Mac
         if: ${{ matrix.target == 'OSX'}}
