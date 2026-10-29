@@ -28,6 +28,11 @@ on:
         required: true
         default: true
         type: boolean
+      build_ios_simulator:
+        description: 'Build iOS arm64 Simulator'
+        required: true
+        default: true
+        type: boolean
       build_osx:
         description: 'Build OSX'
         required: true
@@ -119,6 +124,9 @@ jobs:
                 ;;
               Android-armeabi-v7a-Release)
                 if [ '${{ inputs.build_android_armv7a }}' != 'true' ]; then SHOULD_RUN="false"; fi
+                ;;
+              iOS-arm64-simulator-*)
+                if [ '${{ inputs.build_ios_simulator }}' != 'true' ]; then SHOULD_RUN="false"; fi
                 ;;
               iOS-*)
                 if [ '${{ inputs.build_ios }}' != 'true' ]; then SHOULD_RUN="false"; fi
