@@ -103,7 +103,7 @@ jobs:
             build-type: Release
             container: ghcr.io/geniusventures/almalinux-8:latest
           - target: Windows
-            host: windows-latest
+            host: windows-2022
         exclude:
           - target: Android
             abi: ""
